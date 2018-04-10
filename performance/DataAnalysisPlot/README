@@ -1,0 +1,11 @@
+The two scripts in this folder will aggregate all the data that perf.py produces and then makes images for the tests that are in perf.py.
+
+1) First aggregate the data in order by running format.py:
+	python format.py "fileNameHere" "svn revision here"
+This will append the data provided to the end of the data that is already stored.
+
+2) Second call plot.py to make the pngs.
+	python plot.py
+This will look at the aggregate data files (geotracking.json and performancetracking.json) and generate graphs.
+Cycles and Instructions graphs will be made for individual tests that are inside perf.py over time.
+Also 2 summary geometric-mean graphs will be made for cycles and instructions for ALL the tests inside perf.py.
