@@ -4,3 +4,4 @@ llvm-build
 libllvm
 **/*.swp
 **/*.swo
+cscope.out

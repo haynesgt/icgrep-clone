@@ -1,3 +1,4 @@
+
 /*
  *  Copyright (c) 2017 International Characters.
  *  This software is licensed to the public under the Open Software License 3.0.
@@ -12,6 +13,8 @@
 #include <vector>
 #include <sstream>
 #include <atomic>
+#include <util/aligned_allocator.h>
+#include <boost/filesystem.hpp>
 
 namespace re { class CC; }
 namespace re { class RE; }
@@ -50,13 +53,14 @@ public:
     void setInitialTab() {mInitialTab = true;}
 
     void setMaxCount(int m) {mMaxCount = m;}
+    void setGrepStdIn() {mGrepStdIn = true;}
     void setInvertMatches() {mInvertMatches = true;}
     void setCaseInsensitive()  {mCaseInsensitive = true;}
 
     void suppressFileMessages() {mSuppressFileMessages = true;}
 
     void setRecordBreak(GrepRecordBreakKind b);
-    void initFileResult(std::vector<std::string> & filenames);
+    void initFileResult(std::vector<boost::filesystem::path> & filenames);
     void initREs(std::vector<re::RE *> & REs);
     virtual void grepCodeGen();
     bool searchAllFiles();
@@ -65,7 +69,7 @@ public:
 protected:
     std::pair<parabix::StreamSetBuffer *, parabix::StreamSetBuffer *> grepPipeline(parabix::StreamSetBuffer * ByteStream);
 
-    virtual uint64_t doGrep(const std::string & fileName, const uint32_t fileIdx);
+    virtual uint64_t doGrep(const std::string & fileName, std::ostringstream & strm);
     int32_t openFile(const std::string & fileName, std::ostringstream & msgstrm);
 
     enum class EngineKind {QuietMode, MatchOnly, CountOnly, EmitMatches};
@@ -82,12 +86,13 @@ protected:
     bool mCaseInsensitive;
     bool mInvertMatches;
     int mMaxCount;
+    bool mGrepStdIn;
     
     Driver * mGrepDriver;
 
     std::atomic<unsigned> mNextFileToGrep;
     std::atomic<unsigned> mNextFileToPrint;
-    std::vector<std::string> inputFiles;
+    std::vector<boost::filesystem::path> inputPaths;
     std::vector<std::ostringstream> mResultStrs;
     std::vector<FileStatus> mFileStatus;
     bool grepMatchFound;
@@ -132,21 +137,21 @@ public:
     EmitMatchesEngine();
     void grepCodeGen() override;
 private:
-    uint64_t doGrep(const std::string & fileName, const uint32_t fileIdx) override;
+    uint64_t doGrep(const std::string & fileName, std::ostringstream & strm) override;
 };
 
 class CountOnlyEngine : public GrepEngine {
 public:
     CountOnlyEngine();
 private:
-    uint64_t doGrep(const std::string & fileName, const uint32_t fileIdx) override;
+    uint64_t doGrep(const std::string & fileName, std::ostringstream & strm) override;
 };
 
 class MatchOnlyEngine : public GrepEngine {
 public:
     MatchOnlyEngine(bool showFilesWithoutMatch, bool useNullSeparators);
 private:
-    uint64_t doGrep(const std::string & fileName, const uint32_t fileIdx) override;
+    uint64_t doGrep(const std::string & fileName, std::ostringstream & strm) override;
     unsigned mRequiredCount;
 };
 
@@ -174,28 +179,29 @@ private:
     bool mCaseInsensitive;
 
     Driver * mGrepDriver;
-    bool grepMatchFound;
 };
     
     
-#define MAX_SIMD_WIDTH_SUPPORTED 512
-#define INITIAL_CAPACITY 1024
+#define MAX_SIMD_WIDTH_SUPPORTED 256
+#define INITIAL_CAPACITY 64
     
-    class SearchableBuffer  {
-        SearchableBuffer();
-        void addSearchCandidate(char * string_ptr, size_t length);
-        size_t getCandidateCount() {return mEntries;}
-        char * getBufferBase() {return mBuffer_base;}
-        size_t getBufferSize() {return mSpace_used;}
-        ~SearchableBuffer();
-    private:
-        static const unsigned BUFFER_ALIGNMENT = MAX_SIMD_WIDTH_SUPPORTED/8;
-        size_t mAllocated_capacity;
-        char * mBuffer_base;
-        alignas(BUFFER_ALIGNMENT) char mInitial_buffer[INITIAL_CAPACITY];
-        size_t mSpace_used;
-        size_t mEntries;
-    };
+class SearchableBuffer  {
+public:
+    SearchableBuffer();
+    void addSearchCandidate(const char * string_ptr);
+    size_t getCandidateCount() {return mEntries;}
+    char * getBufferBase() {return mBuffer_base;}
+    size_t getBufferSize() {return mSpace_used;}
+    ~SearchableBuffer();
+private:
+    static const unsigned BUFFER_ALIGNMENT = MAX_SIMD_WIDTH_SUPPORTED/8;
+    AlignedAllocator<char, BUFFER_ALIGNMENT> mAllocator;
+    size_t mAllocated_capacity;
+    size_t mSpace_used;
+    size_t mEntries;
+    char * mBuffer_base;
+    alignas(BUFFER_ALIGNMENT) char mInitial_buffer[INITIAL_CAPACITY];
+};
 
 }
 

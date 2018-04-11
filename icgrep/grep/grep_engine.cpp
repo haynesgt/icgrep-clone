@@ -83,15 +83,16 @@ extern "C" void finalize_match_wrapper(intptr_t accum_addr, char * buffer_end) {
 
 inline static size_t ceil_log2(const size_t v) {
     assert ("log2(0) is undefined!" && v != 0);
-    assert ("sizeof(size_t) == sizeof(ulong)" && sizeof(size_t) == sizeof(ulong));
+    assert ("sizeof(size_t) == sizeof(long)" && sizeof(size_t) == sizeof(long));
     return (sizeof(size_t) * CHAR_BIT) - __builtin_clzl(v - 1UL);
 }
 
-void SearchableBuffer::addSearchCandidate(char * C_string_ptr, size_t length) {
+void SearchableBuffer::addSearchCandidate(const char * C_string_ptr) {
+    size_t length = strlen(C_string_ptr)+1;
     if (mSpace_used + length >= mAllocated_capacity) {
         size_t new_capacity = size_t{1} << (ceil_log2(mSpace_used + length + 1));
         AlignedAllocator<char, BUFFER_ALIGNMENT> alloc;
-        char * new_buffer = alloc.allocate(new_capacity, 0);
+        char * new_buffer = mAllocator.allocate(new_capacity, 0);
         memcpy(new_buffer, mBuffer_base, mSpace_used);
         memset(&new_buffer[mSpace_used], 0, new_capacity-mSpace_used);
         if (mBuffer_base != mInitial_buffer) {
@@ -100,21 +101,23 @@ void SearchableBuffer::addSearchCandidate(char * C_string_ptr, size_t length) {
         mBuffer_base = new_buffer;
         mAllocated_capacity = new_capacity;
     }
-    memcpy((void * ) &mBuffer_base[mSpace_used], C_string_ptr, length+1);
-    mSpace_used += length+1;
+    memcpy((void * ) &mBuffer_base[mSpace_used], C_string_ptr, length);
+    mSpace_used += length;
     assert("Search candidate not null terminated" && (mBuffer_base[mSpace_used] == '\0'));
     mEntries++;
 }
 
 SearchableBuffer::SearchableBuffer() :
-    mAllocated_capacity(INITIAL_CAPACITY), mBuffer_base(mInitial_buffer) {
+    mAllocated_capacity(INITIAL_CAPACITY),
+    mSpace_used(0),
+    mEntries(0),
+    mBuffer_base(mInitial_buffer) {
     memset(mBuffer_base, 0, INITIAL_CAPACITY);
 }
 
 SearchableBuffer::~SearchableBuffer() {
     if (mBuffer_base != mInitial_buffer) {
-        AlignedAllocator<char, BUFFER_ALIGNMENT> alloc;
-        alloc.deallocate(mBuffer_base, 0);
+        mAllocator.deallocate(mBuffer_base, 0);
     }
 }
 
@@ -132,6 +135,7 @@ GrepEngine::GrepEngine() :
     mCaseInsensitive(false),
     mInvertMatches(false),
     mMaxCount(0),
+    mGrepStdIn(false),
     mGrepDriver(nullptr),
     mNextFileToGrep(0),
     mNextFileToPrint(0),
@@ -176,11 +180,11 @@ void GrepEngine::setRecordBreak(GrepRecordBreakKind b) {
     
 
     
-void GrepEngine::initFileResult(std::vector<std::string> & filenames) {
-    const unsigned n = filenames.size();
+void GrepEngine::initFileResult(std::vector<boost::filesystem::path> & paths) {
+    const unsigned n = paths.size();
     mResultStrs.resize(n);
     mFileStatus.resize(n, FileStatus::Pending);
-    inputFiles = filenames;
+    inputPaths = paths;
 }
 
 void GrepEngine::initREs(std::vector<re::RE *> & REs) {
@@ -557,7 +561,7 @@ void EmitMatchesEngine::grepCodeGen() {
 //  The doGrep methods apply a GrepEngine to a single file, processing the results
 //  differently based on the engine type.
 
-uint64_t GrepEngine::doGrep(const std::string & fileName, const uint32_t fileIdx) {
+uint64_t GrepEngine::doGrep(const std::string & fileName, std::ostringstream & strm) {
     typedef uint64_t (*GrepFunctionType)(bool useMMap, int32_t fileDescriptor);
     using namespace boost::filesystem;
     path p(fileName);
@@ -567,7 +571,7 @@ uint64_t GrepEngine::doGrep(const std::string & fileName, const uint32_t fileIdx
 
     auto f = reinterpret_cast<GrepFunctionType>(mGrepDriver->getMain());
 
-    int32_t fileDescriptor = openFile(fileName, mResultStrs[fileIdx]);
+    int32_t fileDescriptor = openFile(fileName, strm);
     if (fileDescriptor == -1) return 0;
 
     uint64_t grepResult = f(useMMap, fileDescriptor);
@@ -575,10 +579,10 @@ uint64_t GrepEngine::doGrep(const std::string & fileName, const uint32_t fileIdx
     return grepResult;
 }
 
-uint64_t CountOnlyEngine::doGrep(const std::string & fileName, const uint32_t fileIdx) {
-    uint64_t grepResult = GrepEngine::doGrep(fileName, fileIdx);
-    if (mShowFileNames) mResultStrs[fileIdx] << linePrefix(fileName);
-    mResultStrs[fileIdx] << grepResult << "\n";
+uint64_t CountOnlyEngine::doGrep(const std::string & fileName, std::ostringstream & strm) {
+    uint64_t grepResult = GrepEngine::doGrep(fileName, strm);
+    if (mShowFileNames) strm << linePrefix(fileName);
+    strm << grepResult << "\n";
     return grepResult;
 }
 
@@ -592,15 +596,15 @@ std::string GrepEngine::linePrefix(std::string fileName) {
     }
 }
 
-uint64_t MatchOnlyEngine::doGrep(const std::string & fileName, const uint32_t fileIdx) {
-    uint64_t grepResult = GrepEngine::doGrep(fileName, fileIdx);
+uint64_t MatchOnlyEngine::doGrep(const std::string & fileName, std::ostringstream & strm) {
+    uint64_t grepResult = GrepEngine::doGrep(fileName, strm);
     if (grepResult == mRequiredCount) {
-       mResultStrs[fileIdx] << linePrefix(fileName);
+       strm << linePrefix(fileName);
     }
     return grepResult;
 }
 
-uint64_t EmitMatchesEngine::doGrep(const std::string & fileName, const uint32_t fileIdx) {
+uint64_t EmitMatchesEngine::doGrep(const std::string & fileName, std::ostringstream & strm) {
     typedef uint64_t (*GrepFunctionType)(bool useMMap, int32_t fileDescriptor, intptr_t accum_addr);
     using namespace boost::filesystem;
     path p(fileName);
@@ -608,9 +612,9 @@ uint64_t EmitMatchesEngine::doGrep(const std::string & fileName, const uint32_t 
     if (p == "-") useMMap = false;
     if (!is_regular_file(p)) useMMap = false;
     auto f = reinterpret_cast<GrepFunctionType>(mGrepDriver->getMain());
-    int32_t fileDescriptor = openFile(fileName, mResultStrs[fileIdx]);
+    int32_t fileDescriptor = openFile(fileName, strm);
     if (fileDescriptor == -1) return 0;
-    EmitMatch accum(linePrefix(fileName), mShowLineNumbers, mInitialTab, mResultStrs[fileIdx]);
+    EmitMatch accum(linePrefix(fileName), mShowLineNumbers, mInitialTab, strm);
     f(useMMap, fileDescriptor, reinterpret_cast<intptr_t>(&accum));
     close(fileDescriptor);
     if (accum.mLineCount > 0) grepMatchFound = true;
@@ -658,7 +662,7 @@ void * DoGrepThreadFunction(void *args) {
 }
 
 bool GrepEngine::searchAllFiles() {
-    const unsigned numOfThreads = std::min(static_cast<unsigned>(Threads), static_cast<unsigned>(inputFiles.size())); 
+    const unsigned numOfThreads = std::min(static_cast<unsigned>(Threads), static_cast<unsigned>(inputPaths.size()));
     std::vector<pthread_t> threads(numOfThreads);
 
     for(unsigned long i = 1; i < numOfThreads; ++i) {
@@ -684,11 +688,11 @@ bool GrepEngine::searchAllFiles() {
 void * GrepEngine::DoGrepThreadMethod() {
 
     unsigned fileIdx = mNextFileToGrep++;
-    while (fileIdx < inputFiles.size()) {
+    while (fileIdx < inputPaths.size()) {
         if (codegen::DebugOptionIsSet(codegen::TraceCounts)) {
-            errs() << "Tracing " << inputFiles[fileIdx] << "\n";
+            errs() << "Tracing " << inputPaths[fileIdx].string() << "\n";
         }
-        const auto grepResult = doGrep(inputFiles[fileIdx], fileIdx);
+        const auto grepResult = doGrep(inputPaths[fileIdx].string(), mResultStrs[fileIdx]);
         mFileStatus[fileIdx] = FileStatus::GrepComplete;
         if (grepResult > 0) {
             grepMatchFound = true;
@@ -703,7 +707,7 @@ void * GrepEngine::DoGrepThreadMethod() {
     }
 
     unsigned printIdx = mNextFileToPrint++;
-    while (printIdx < inputFiles.size()) {
+    while (printIdx < inputPaths.size()) {
         const bool readyToPrint = ((printIdx == 0) || (mFileStatus[printIdx - 1] == FileStatus::PrintComplete)) && (mFileStatus[printIdx] == FileStatus::GrepComplete);
         if (readyToPrint) {
             const auto output = mResultStrs[printIdx].str();
@@ -723,6 +727,12 @@ void * GrepEngine::DoGrepThreadMethod() {
     } else {
         // Always perform one final cache cleanup step.
         mGrepDriver->performIncrementalCacheCleanupStep();
+        if (mGrepStdIn) {
+            std::ostringstream s;
+            const auto grepResult = doGrep("-", s);
+            llvm::outs() << s.str();
+            if (grepResult) grepMatchFound = true;
+        }
     }
     return nullptr;
 }
@@ -732,8 +742,7 @@ void * GrepEngine::DoGrepThreadMethod() {
 InternalSearchEngine::InternalSearchEngine() :
     mGrepRecordBreak(GrepRecordBreakKind::LF),
     mCaseInsensitive(false),
-    mGrepDriver(nullptr),
-    grepMatchFound(false) {}
+    mGrepDriver(nullptr) {}
     
 InternalSearchEngine::~InternalSearchEngine() {
     delete mGrepDriver;
@@ -748,7 +757,7 @@ void InternalSearchEngine::grepCodeGen(re::RE * matchingRE, re::RE * excludedRE,
     
     re::CC * breakCC = nullptr;
     if (mGrepRecordBreak == GrepRecordBreakKind::Null) {
-        breakCC = re::makeByte(0xA);
+        breakCC = re::makeByte(0x0);
     } else {// if (mGrepRecordBreak == GrepRecordBreakKind::LF)
         breakCC = re::makeByte(0x0A);
     }
@@ -757,12 +766,14 @@ void InternalSearchEngine::grepCodeGen(re::RE * matchingRE, re::RE * excludedRE,
         matchingRE = regular_expression_passes(matchingRE);
         matchingRE = re::exclude_CC(matchingRE, breakCC);
         matchingRE = resolveAnchors(matchingRE, breakCC);
+        matchingRE = toUTF8(matchingRE);
     }
     if (excludedRE != nullptr) {
         excludedRE = resolveCaseInsensitiveMode(excludedRE, mCaseInsensitive);
         excludedRE = regular_expression_passes(excludedRE);
         excludedRE = re::exclude_CC(excludedRE, breakCC);
         excludedRE = resolveAnchors(excludedRE, breakCC);
+        excludedRE = toUTF8(excludedRE);
     }
     Function * mainFunc = cast<Function>(M->getOrInsertFunction("Main", idb->getVoidTy(), idb->getInt8PtrTy(), idb->getSizeTy(), nullptr));
     mainFunc->setCallingConv(CallingConv::C);
@@ -786,17 +797,17 @@ void InternalSearchEngine::grepCodeGen(re::RE * matchingRE, re::RE * excludedRE,
     kernel::Kernel * breakK = mGrepDriver->addKernelInstance<kernel::ParabixCharacterClassKernelBuilder>(idb, RBname, std::vector<re::CC *>{breakCC}, 8);
     mGrepDriver->makeKernelCall(breakK, {BasisBits}, {RecordBreakStream});
     
-    StreamSetBuffer * MatchingRecords = mGrepDriver->addBuffer<CircularBuffer>(idb, idb->getStreamSetTy(1, 1), segmentSize);
     
     std::vector<std::string> externalStreamNames;
+    StreamSetBuffer * MatchingRecords = nullptr;
     if (matchingRE != nullptr) {
         StreamSetBuffer * MatchResults = mGrepDriver->addBuffer<CircularBuffer>(idb, idb->getStreamSetTy(1, 1), segmentSize);
         kernel::Kernel * includeK = mGrepDriver->addKernelInstance<kernel::ICGrepKernel>(idb, matchingRE, externalStreamNames);
         mGrepDriver->makeKernelCall(includeK, {BasisBits}, {MatchResults});
+        MatchingRecords = mGrepDriver->addBuffer<CircularBuffer>(idb, idb->getStreamSetTy(1, 1), segmentSize);
         kernel::Kernel * matchedLinesK = mGrepDriver->addKernelInstance<kernel::MatchedLinesKernel>(idb);
         mGrepDriver->makeKernelCall(matchedLinesK, {MatchResults, RecordBreakStream}, {MatchingRecords});
     }
-    
     if (excludedRE != nullptr) {
         StreamSetBuffer * ExcludedResults = mGrepDriver->addBuffer<CircularBuffer>(idb, idb->getStreamSetTy(1, 1), segmentSize);
         kernel::Kernel * excludeK = mGrepDriver->addKernelInstance<kernel::ICGrepKernel>(idb, excludedRE, externalStreamNames);
@@ -810,14 +821,15 @@ void InternalSearchEngine::grepCodeGen(re::RE * matchingRE, re::RE * excludedRE,
             StreamSetBuffer * nonExcluded = mGrepDriver->addBuffer<CircularBuffer>(idb, idb->getStreamSetTy(1, 1), segmentSize);
             mGrepDriver->makeKernelCall(invertK, {ExcludedRecords, RecordBreakStream}, {nonExcluded});
             StreamSetBuffer * included = MatchingRecords;
-            kernel::Kernel * streamsMergeK = mGrepDriver->addKernelInstance<kernel::StreamsMerge>(idb, 1, 2);
-            mGrepDriver->makeKernelCall(streamsMergeK, {included, nonExcluded}, {MatchingRecords});
+            MatchingRecords = mGrepDriver->addBuffer<CircularBuffer>(idb, idb->getStreamSetTy(1, 1), segmentSize);
+            kernel::Kernel * streamsIntersectK = mGrepDriver->addKernelInstance<kernel::StreamsIntersect>(idb, 1, 2);
+            mGrepDriver->makeKernelCall(streamsIntersectK, {included, nonExcluded}, {MatchingRecords});
         }
         else {
+            MatchingRecords = mGrepDriver->addBuffer<CircularBuffer>(idb, idb->getStreamSetTy(1, 1), segmentSize);
             mGrepDriver->makeKernelCall(invertK, {ExcludedRecords, RecordBreakStream}, {MatchingRecords});
         }
     }
-
     kernel::Kernel * scanMatchK = mGrepDriver->addKernelInstance<kernel::ScanMatchKernel>(idb);
     scanMatchK->setInitialArguments({ConstantInt::get(idb->getIntAddrTy(), reinterpret_cast<intptr_t>(accum))});
     mGrepDriver->makeKernelCall(scanMatchK, {MatchingRecords, RecordBreakStream, ByteStream}, {});
