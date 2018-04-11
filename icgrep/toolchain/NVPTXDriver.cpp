@@ -182,7 +182,7 @@ void NVPTXDriver::finalizeObject() {
 
     PM.run(*mMainModule);  
 
-    if (LLVM_UNLIKELY(codegen::DebugOptionIsSet(codegen::ShowIR))) {
+    if (LLVM_UNLIKELY(codegen::ShowIROption != "")) {
         mMainModule->dump();
     }
 

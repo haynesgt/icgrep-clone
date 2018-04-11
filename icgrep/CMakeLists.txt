@@ -38,6 +38,7 @@ if(ENABLE_CUDA_COMPILE)
     include_directories(${CUDA_INCLUDE})
     SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCUDA_ENABLED")
     SET(CUDA_LIB "cuda")
+    SET(CUDA_RT "cudart")
   endif(CUDA_FOUND)
 endif()
 
@@ -132,17 +133,17 @@ add_executable(lz4_grep grep_interface.cpp util/file_select.cpp lz4_grep.cpp lz4
 #Exclude CoRE from default build.
 set_target_properties(core PROPERTIES EXCLUDE_FROM_ALL 1)
 
-target_link_libraries (icgrep GrepEngine UCDlib PabloADT RegExpCompiler CCADT CodeGen ${REQ_LLVM_LIBRARIES} ${Boost_LIBRARIES} ${CUDA_LIB})
-target_link_libraries (u8u16 PabloADT CCADT CodeGen ${REQ_LLVM_LIBRARIES} ${Boost_LIBRARIES} ${CUDA_LIB})
-target_link_libraries (base64 PabloADT CCADT CodeGen ${REQ_LLVM_LIBRARIES} ${Boost_LIBRARIES} ${CUDA_LIB})
-target_link_libraries (wc GrepEngine UCDlib PabloADT RegExpCompiler  CCADT CodeGen ${REQ_LLVM_LIBRARIES} ${Boost_LIBRARIES} ${CUDA_LIB})
-target_link_libraries (editd PabloADT CCADT CodeGen ${REQ_LLVM_LIBRARIES} ${Boost_LIBRARIES} ${CUDA_LIB})
-target_link_libraries (lz4d PabloADT CCADT CodeGen ${REQ_LLVM_LIBRARIES} ${Boost_LIBRARIES} ${CUDA_LIB})
+target_link_libraries (icgrep GrepEngine UCDlib PabloADT RegExpCompiler CCADT CodeGen ${REQ_LLVM_LIBRARIES} ${Boost_LIBRARIES} ${CUDA_LIB} ${CUDA_RT})
+target_link_libraries (u8u16 PabloADT CCADT CodeGen ${REQ_LLVM_LIBRARIES} ${Boost_LIBRARIES} ${CUDA_LIB} ${CUDA_RT})
+target_link_libraries (base64 PabloADT CCADT CodeGen ${REQ_LLVM_LIBRARIES} ${Boost_LIBRARIES} ${CUDA_LIB} ${CUDA_RT})
+target_link_libraries (wc GrepEngine UCDlib PabloADT RegExpCompiler  CCADT CodeGen ${REQ_LLVM_LIBRARIES} ${Boost_LIBRARIES} ${CUDA_LIB} ${CUDA_RT})
+target_link_libraries (editd PabloADT CCADT CodeGen ${REQ_LLVM_LIBRARIES} ${Boost_LIBRARIES} ${CUDA_LIB} ${CUDA_RT})
+target_link_libraries (lz4d PabloADT CCADT CodeGen ${REQ_LLVM_LIBRARIES} ${Boost_LIBRARIES} ${CUDA_LIB} ${CUDA_RT})
 target_link_libraries (core RegExpCompiler ${REQ_LLVM_LIBRARIES} ${Boost_LIBRARIES})
-target_link_libraries (character_deletion PabloADT RegExpCompiler CCADT CodeGen ${REQ_LLVM_LIBRARIES} ${Boost_LIBRARIES} ${CUDA_LIB})
-target_link_libraries (character_deposit PabloADT RegExpCompiler CCADT CodeGen ${REQ_LLVM_LIBRARIES} ${Boost_LIBRARIES} ${CUDA_LIB})
-target_link_libraries (lz4d_ext_dep LZ4_Lib PabloADT CCADT CodeGen ${REQ_LLVM_LIBRARIES} ${Boost_LIBRARIES} ${CUDA_LIB})
-target_link_libraries (lz4_grep LZ4_Lib GrepEngine UCDlib PabloADT RegExpCompiler CodeGen CCADT CodeGen ${REQ_LLVM_LIBRARIES} ${Boost_LIBRARIES} ${CUDA_LIB})
+target_link_libraries (character_deletion PabloADT RegExpCompiler CCADT CodeGen ${REQ_LLVM_LIBRARIES} ${Boost_LIBRARIES} ${CUDA_LIB} ${CUDA_RT})
+target_link_libraries (character_deposit PabloADT RegExpCompiler CCADT CodeGen ${REQ_LLVM_LIBRARIES} ${Boost_LIBRARIES} ${CUDA_LIB} ${CUDA_RT})
+target_link_libraries (lz4d_ext_dep LZ4_Lib PabloADT CCADT CodeGen ${REQ_LLVM_LIBRARIES} ${Boost_LIBRARIES} ${CUDA_LIB} ${CUDA_RT})
+target_link_libraries (lz4_grep LZ4_Lib GrepEngine UCDlib PabloADT RegExpCompiler CodeGen CCADT CodeGen ${REQ_LLVM_LIBRARIES} ${Boost_LIBRARIES} ${CUDA_LIB} ${CUDA_RT})
 
 
 

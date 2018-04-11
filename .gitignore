@@ -1,1 +1,6 @@
 .svn
+icgrep-build
+llvm-build
+libllvm
+**/*.swp
+**/*.swo
