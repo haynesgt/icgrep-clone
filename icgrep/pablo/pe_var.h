@@ -12,7 +12,7 @@
 
 namespace pablo {
 
-class Var : public NamedPabloAST {
+class Var : public PabloAST {
     friend class PabloBlock;
     friend class PabloAST;
     friend class PabloKernel;
@@ -76,23 +76,23 @@ public:
             mAttribute &= ~(Attribute::Scalar);
         }
     }
-
-    const String & getName() const final {
-        assert (mName);
+    const String & getName() const noexcept {
         return *mName;
     }
 
 protected:
     Var(const String * name, llvm::Type * const type, Allocator & allocator, const Attribute attr = Attribute::None)
-    : NamedPabloAST(ClassTypeId::Var, type, name, allocator)
-    , mAttribute(attr) {
+    : PabloAST(ClassTypeId::Var, type, allocator)
+    , mAttribute(attr)
+    , mName(name) {
 
     }
 private:
     unsigned mAttribute;
+    const String * const mName;
 };
 
-class Extract : public PabloAST {
+class Extract : public Statement {
     friend class PabloBlock;
 public:
     static inline bool classof(const PabloAST * e) {
@@ -103,22 +103,17 @@ public:
     }
     virtual ~Extract(){
     }
-    inline Var * getArray() const {
-        return mArray;
+    inline PabloAST * getArray() const {
+        return getOperand(0);
     }
     inline PabloAST * getIndex() const {
-        return mIndex;
+        return getOperand(1);
     }
 protected:
-    Extract(Var * array, PabloAST * const index, llvm::Type * type, Allocator & allocator)
-    : PabloAST(ClassTypeId::Extract, type, allocator)
-    , mArray(array)
-    , mIndex(index) {
+    Extract(PabloAST * array, PabloAST * const index, const String * const name, llvm::Type * type, Allocator & allocator)
+    : Statement(ClassTypeId::Extract, type, {array, index}, name, allocator) {
 
     }
-private:
-    Var * const mArray;
-    PabloAST * const mIndex;
 };
 
 }

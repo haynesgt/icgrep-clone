@@ -18,14 +18,16 @@ using namespace pablo;
 using namespace llvm;
 
 void DelMaskKernelBuilder::generatePabloMethod() {
-    PabloBuilder main(getEntryScope());
     //  input: 8 basis bit streams
     
-    std::vector<PabloAST *> u8_bits = getInputStreamSet("u8bit");
+    const auto u8bitSet = this->getInputStreamVar("u8bit");
+    
     //  output: delmask stream + error stream
     
-    cc::Parabix_CC_Compiler ccc(getEntryScope(), u8_bits);
+    cc::CC_Compiler ccc(this, u8bitSet);
     
+    PabloBuilder & main = ccc.getBuilder();
+    const auto u8_bits = ccc.getBasisBits();
     Zeroes * zeroes = main.createZeroes();
 
     // Outputs
@@ -33,9 +35,12 @@ void DelMaskKernelBuilder::generatePabloMethod() {
     Var * neg_delmask = main.createVar("neg_delmask", zeroes);
     Var * error_mask = main.createVar("error_mask", zeroes);
     
-    PabloAST * u8pfx = ccc.compileCC(re::makeCC(0xC0, 0xFF));
-    PabloAST * nonASCII = ccc.compileCC(re::makeCC(0x80, 0xFF));
-    auto it = main.createScope();
+    PabloAST * ASCII = ccc.compileCC("ASCII", re::makeCC(0x0, 0x7F), main);
+    PabloBuilder ascii = PabloBuilder::Create(main);
+    main.createIf(ASCII, ascii);
+    PabloAST * u8pfx = ccc.compileCC("u8pfx", re::makeCC(0xC0, 0xFF), main);
+    PabloAST * nonASCII = ccc.compileCC("u8pfx", re::makeCC(0x80, 0xFF), main);
+    PabloBuilder it = PabloBuilder::Create(main);
     main.createIf(nonASCII, it);
     Var * u8invalid = it.createVar("u8invalid", zeroes);
     PabloAST * u8pfx2 = ccc.compileCC(re::makeCC(0xC2, 0xDF), it);
@@ -45,7 +50,7 @@ void DelMaskKernelBuilder::generatePabloMethod() {
     //
     // Two-byte sequences
     Var * u8scope22 = it.createVar("u8scope22", zeroes);
-    auto it2 = it.createScope();
+    PabloBuilder it2 = PabloBuilder::Create(it);
     it.createIf(u8pfx2, it2);
     it2.createAssign(u8scope22, it2.createAdvance(u8pfx2, 1));
     //
@@ -53,7 +58,7 @@ void DelMaskKernelBuilder::generatePabloMethod() {
     Var * u8scope3X = it.createVar("u8scope3X", zeroes);
     Var * EX_invalid = it.createVar("EX_invalid", zeroes);
     Var * del3 = it.createVar("del3", zeroes);
-    auto it3 = it.createScope();
+    PabloBuilder it3 = PabloBuilder::Create(it);
     it.createIf(u8pfx3, it3);
     PabloAST * u8scope32 = it3.createAdvance(u8pfx3, 1, "u8scope32");
     PabloAST * u8scope33 = it3.createAdvance(u8scope32, 1, "u8scope33");
@@ -68,7 +73,7 @@ void DelMaskKernelBuilder::generatePabloMethod() {
     Var * u8scope4X = it.createVar("u8scope4X", zeroes);
     Var * FX_invalid = it.createVar("FX_invalid", zeroes);
     Var * del4 = it.createVar("del4", zeroes);
-    auto it4 = it.createScope();
+    PabloBuilder it4 = PabloBuilder::Create(it);
     it.createIf(u8pfx4, it4);
     PabloAST * u8scope42 = it4.createAdvance(u8pfx4, 1, "u8scope42");
     PabloAST * u8scope43 = it4.createAdvance(u8scope42, 1, "u8scope43");
@@ -92,8 +97,8 @@ void DelMaskKernelBuilder::generatePabloMethod() {
     //PabloAST * u8valid = it.createNot(u8invalid, "u8valid");
     it.createAssign(error_mask, u8invalid);
     
-    it.createAssign(delmask, it.createInFile(it.createOr(it.createOr(del3, del4), ccc.compileCC(re::makeCC(0xC0, 0xFF), it))));
-    it.createAssign(neg_delmask, it.createInFile(it.createNot(delmask)));
+    it.createAssign(delmask, it.createOr(it.createOr(del3, del4), ccc.compileCC(re::makeCC(0xC0, 0xFF), it)));
+    it.createAssign(neg_delmask, it.createNot(delmask));
     
     Var * delmask_out = this->getOutputStreamVar("delMask");
     Var * neg_delmask_out = this->getOutputStreamVar("neg_delMask");

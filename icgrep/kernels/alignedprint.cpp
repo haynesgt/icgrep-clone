@@ -93,19 +93,6 @@ void SelectStream::generateDoBlockMethod(const std::unique_ptr<KernelBuilder> &i
     iBuilder->storeOutputStreamBlock("bitStream", iBuilder->getInt32(0), bitStrmVal);
 }
 
-void ExpandOrSelectStreams::generateDoBlockMethod(const std::unique_ptr<KernelBuilder> &iBuilder) {
-
-    for (unsigned i = 0; i < mSizeOutputStreamSet; i++) {
-        if (i < mSizeInputStreamSet) {
-            Value * bitStrmVal = iBuilder->loadInputStreamBlock("bitStreams", iBuilder->getInt32(i));
-            iBuilder->storeOutputStreamBlock("outputbitStreams", iBuilder->getInt32(i), bitStrmVal);
-        } else {
-            iBuilder->storeOutputStreamBlock("outputbitStreams", iBuilder->getInt32(i), iBuilder->bitCast(Constant::getNullValue(iBuilder->getBitBlockType())));
-        }
-    }
-    
-}
-
 void PrintStreamSet::generateDoBlockMethod(const std::unique_ptr<KernelBuilder> &iBuilder) {
 
     /*
@@ -269,16 +256,12 @@ void PrintStreamSet::generateDoBlockMethod(const std::unique_ptr<KernelBuilder> 
 
 PrintableBits::PrintableBits(const std::unique_ptr<kernel::KernelBuilder> & builder)
 : BlockOrientedKernel("PrintableBits", {Binding{builder->getStreamSetTy(1), "bitStream"}}, {Binding{builder->getStreamSetTy(1, 8), "byteStream"}}, {}, {}, {}) {
-
+    setNoTerminateAttribute(true);
 }
 
 SelectStream::SelectStream(const std::unique_ptr<kernel::KernelBuilder> & builder, unsigned sizeInputStreamSet, unsigned streamIndex)
 : BlockOrientedKernel("SelectStream", {Binding{builder->getStreamSetTy(sizeInputStreamSet), "bitStreams"}}, {Binding{builder->getStreamSetTy(1, 1), "bitStream"}}, {}, {}, {}), mSizeInputStreamSet(sizeInputStreamSet), mStreamIndex(streamIndex) {
-
-}
-
-ExpandOrSelectStreams::ExpandOrSelectStreams(const std::unique_ptr<kernel::KernelBuilder> & builder, unsigned sizeInputStreamSet, unsigned sizeOutputStreamSet)
-: BlockOrientedKernel("ExpandOrSelectStreams", {Binding{builder->getStreamSetTy(sizeInputStreamSet), "bitStreams"}}, {Binding{builder->getStreamSetTy(sizeOutputStreamSet), "outputbitStreams"}}, {}, {}, {}), mSizeInputStreamSet(sizeInputStreamSet), mSizeOutputStreamSet(sizeOutputStreamSet) {
+    setNoTerminateAttribute(true);
 
 }
 

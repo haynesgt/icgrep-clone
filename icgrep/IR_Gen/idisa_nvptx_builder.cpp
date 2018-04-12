@@ -3,7 +3,7 @@
  *  This software is licensed to the public under the Open Software License 3.0.
  *  icgrep is a trademark of International Characters.
  */
-#include <toolchain/toolchain.h>
+
 #include "idisa_nvptx_builder.h"
 #include <llvm/IR/InlineAsm.h>
 #include <llvm/IR/Module.h>
@@ -209,14 +209,16 @@ void IDISA_NVPTX20_Builder::CreateLongAddFunc(){
 
   CreateCall(barrierFunc);
 
+  Value * carryOffsetPtr = nullptr;
   Value * carryVal = carryInitVal;
+  Value * bubbleOffsetPtr = nullptr;
   Value * bubbleVal = bubbleInitVal;
 
   for (unsigned offset = groupThreads/2; offset>0; offset=offset>>1){
-    Value * carryOffsetPtr = CreateGEP(carry, {getInt32(0), CreateXor(id, getInt32(offset))});
+    carryOffsetPtr = CreateGEP(carry, {getInt32(0), CreateXor(id, getInt32(offset))});
     carryVal = CreateOr(carryVal, CreateLoad(carryOffsetPtr));
     CreateStore(carryVal, carryPtr);
-    Value * bubbleOffsetPtr = CreateGEP(bubble, {getInt32(0), CreateXor(id, getInt32(offset))});
+    bubbleOffsetPtr = CreateGEP(bubble, {getInt32(0), CreateXor(id, getInt32(offset))});
     bubbleVal = CreateOr(bubbleVal, CreateLoad(bubbleOffsetPtr));
     CreateStore(bubbleVal, bubblePtr);
     CreateCall(barrierFunc);
@@ -262,11 +264,8 @@ void IDISA_NVPTX20_Builder::CreateBallotFunc(){
     FunctionType * AsmFnTy = FunctionType::get(int32ty, int32ty, false);
     InlineAsm *IA = InlineAsm::get(AsmFnTy, AsmStream, "=r,r", true, false);
     CallInst * result = CreateCall(IA, conv);
-#if LLVM_VERSION_INTEGER < LLVM_VERSION_CODE(5, 0, 0)
     result->addAttribute(AttributeSet::FunctionIndex, Attribute::NoUnwind);
-#else
-    result->addAttribute(AttributeList::FunctionIndex, Attribute::NoUnwind);
-#endif
+
     CreateRet(result);
 }
 

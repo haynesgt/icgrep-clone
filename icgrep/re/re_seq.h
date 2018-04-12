@@ -23,7 +23,7 @@ public:
     virtual ~Seq() {}
 protected:
     friend Seq * makeSeq();
-    template<typename iterator> friend RE * makeSeq(const iterator, const iterator);
+    template<typename iterator> friend RE * makeSeq(iterator, iterator);
     Seq()
     : Vector(ClassTypeId::Seq) {
 
@@ -32,38 +32,44 @@ protected:
     : Vector(ClassTypeId::Seq, begin, end) {
 
     }
+    template<typename itr> void flatten(itr begin, itr end);
 };
 
 inline Seq * makeSeq() {
     return new Seq();
 }
 
-template<typename iterator>
-inline RE * makeSeq(const iterator begin, const iterator end) {
-    Seq * seq = makeSeq();
+template<typename itr>
+void Seq::flatten(itr begin, itr end) {
     for (auto i = begin; i != end; ++i) {
-        RE * const item = *i;
-        if (LLVM_UNLIKELY(llvm::isa<Seq>(item))) {
-            for (RE * const innerItem : *llvm::cast<Seq>(item)) {
-                seq->push_back(innerItem);
-            }
+        if (LLVM_UNLIKELY(llvm::isa<Seq>(*i))) {
+            flatten<Seq::iterator>(llvm::cast<Seq>(*i)->begin(), llvm::cast<Seq>(*i)->end());
         } else {
-            seq->push_back(item);
+            push_back(*i);
         }
     }
-    if (seq->size() == 1) {
-        return seq->front();
+}
+
+template<typename itr>
+inline RE * makeSeq(itr begin, itr end) {
+    if (LLVM_UNLIKELY(std::distance(begin, end) == 0)) {
+        return makeSeq();
+    } else if (std::distance(begin, end) == 1) {
+        return *begin;
+    } else {
+        Seq * seq = makeSeq();
+        seq->flatten(begin, end);
+        if (seq->size() == 1) {
+            return seq->front();
+        }
+        return seq;
     }
-    return seq;
 }
 
 inline RE * makeSeq(RE::InitializerList list) {
     return makeSeq(list.begin(), list.end());
 }
 
-inline bool isEmptySeq(RE * s) {
-    return llvm::isa<Seq>(s) && llvm::cast<Seq>(s)->empty();
-}
 }
 
 #endif // RE_SEQ_H

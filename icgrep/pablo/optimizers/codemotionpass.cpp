@@ -9,9 +9,6 @@
 #include <pablo/analysis/pabloverifier.hpp>
 #endif
 
-#include <llvm/Support/raw_ostream.h>
-#include <pablo/printer_pablos.h>
-
 using namespace llvm;
 
 namespace pablo {
@@ -87,7 +84,7 @@ struct CodeMotionPassContainer {
             if (LLVM_LIKELY(isa<Statement>(use))) {
                 mScopes.insert(cast<Statement>(use)->getParent());
             } else if (LLVM_UNLIKELY(isa<PabloKernel>(use))) {
-                mScopes.insert(cast<PabloKernel>(use)->getEntryScope());
+                mScopes.insert(cast<PabloKernel>(use)->getEntryBlock());
             }
         }
     }
@@ -126,6 +123,10 @@ struct CodeMotionPassContainer {
             getScopesOfAllUsers(isa<Assign>(stmt) ? cast<Assign>(stmt)->getVariable() : stmt);
         }
         if (LLVM_UNLIKELY(mScopes.empty())) {
+            assert (!isa<Assign>(stmt));
+            // should not occur unless we have a branch with no escaped vars or a statement
+            // that has no users. In either event, the statement itself should be removed.
+            stmt->eraseFromParent(true);
             return;
         }
         while (mScopes.size() > 1) {
@@ -181,49 +182,35 @@ struct CodeMotionPassContainer {
         assert (mLoopVariants.empty());
         for (Var * variant : loop->getEscaped()) {
             mLoopVariants.insert(variant);
-            mLoopInvariants.insert(variant);
         }
-        mLoopInvariants.erase(loop->getCondition());
-
         Statement * outerNode = loop->getPrevNode();
         Statement * stmt = loop->getBody()->front();
         while (stmt) {
             if (isa<Branch>(stmt)) {
                 for (Var * var : cast<Branch>(stmt)->getEscaped()) {
                     mLoopVariants.insert(var);
-                    mLoopInvariants.erase(var);
                 }
                 stmt = stmt->getNextNode();
             } else {
                 bool invariant = true;
-                if (LLVM_UNLIKELY(isa<Assign>(stmt))) {
-                    if (mLoopVariants.count(cast<Assign>(stmt)->getValue()) != 0) {
+                for (unsigned i = 0; i != stmt->getNumOperands(); ++i) {
+                    if (mLoopVariants.count(stmt->getOperand(i)) != 0) {
                         invariant = false;
-                    }
-                } else {
-                    for (unsigned i = 0; i != stmt->getNumOperands(); ++i) {
-                        const PabloAST * const op = stmt->getOperand(i);
-                        if (mLoopVariants.count(op) != 0) {
-                            if (isa<Var>(op)) {
-                                mLoopInvariants.erase(op);
-                            }
-                            invariant = false;
-                        }
+                        break;
                     }
                 }
-
-                Statement * const next = stmt->getNextNode();
-                if (LLVM_UNLIKELY(invariant)) {                    
+                if (LLVM_UNLIKELY(invariant)) {
+                    Statement * next = stmt->getNextNode();
                     stmt->insertAfter(outerNode);
-                    outerNode = stmt;                    
+                    outerNode = stmt;
+                    stmt = next;
                 } else {
                     mLoopVariants.insert(stmt);
+                    stmt = stmt->getNextNode();
                 }
-                stmt = next;
             }
         }
         mLoopVariants.clear();
-        assert (mLoopInvariants.empty());
     }
 
     /** ------------------------------------------------------------------------------------------------------------- *
@@ -261,7 +248,6 @@ private:
     ScopeSet        mScopes;
     UserSet         mUsers;
     LoopVariants    mLoopVariants;
-    LoopVariants    mLoopInvariants;
 };
 
 /** ------------------------------------------------------------------------------------------------------------- *
@@ -269,7 +255,7 @@ private:
  ** ------------------------------------------------------------------------------------------------------------- */
 bool CodeMotionPass::optimize(PabloKernel * kernel) {
     CodeMotionPassContainer C;
-    C.doCodeMovement(kernel->getEntryScope());
+    C.doCodeMovement(kernel->getEntryBlock());
     #ifndef NDEBUG
     PabloVerifier::verify(kernel, "post-code-motion");
     #endif

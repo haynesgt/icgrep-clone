@@ -14,7 +14,6 @@
 #include <pablo/ps_assign.h>
 #include <pablo/branch.h>
 #include <pablo/printer_pablos.h>
-#include <llvm/Support/ErrorHandling.h>
 #include <llvm/Support/raw_os_ostream.h>
 
 using namespace boost::container;
@@ -24,17 +23,13 @@ namespace pablo {
 
 using TypeId = PabloAST::ClassTypeId;
 
-size_t constexpr __length(const char * const str) {
-    return *str ? 1 + __length(str + 1) : 0;
-}
-
 /** ------------------------------------------------------------------------------------------------------------- *
  * @brief equals
  *
  *  Return true if expr1 and expr2 can be proven equivalent according to some rules, false otherwise.  Note that
  *  false may be returned i some cases when the exprs are equivalent.
  ** ------------------------------------------------------------------------------------------------------------- */
-bool equals(const PabloAST * const expr1, const PabloAST * const expr2) noexcept {
+bool equals(const PabloAST * const expr1, const PabloAST * const expr2) {
     assert (expr1 && expr2);
     if (LLVM_UNLIKELY(expr1 == expr2)) {
         return true;
@@ -50,20 +45,30 @@ bool equals(const PabloAST * const expr1, const PabloAST * const expr2) noexcept
                 return equals(cast<InFile>(expr1)->getOperand(0), cast<InFile>(expr2)->getOperand(0));
             } else if (isa<AtEOF>(expr1)) {
                 return equals(cast<AtEOF>(expr1)->getOperand(0), cast<AtEOF>(expr2)->getOperand(0));
-            } else if (isa<And>(expr1) || isa<Or>(expr1) || isa<Xor>(expr1)) {
-                PabloAST * op1[2];
-                PabloAST * op2[2];
-                op1[0] = cast<Statement>(expr1)->getOperand(0);
-                op1[1] = cast<Statement>(expr1)->getOperand(1);
-                if (op1[1] < op1[0]) {
-                    std::swap(op1[0], op1[1]);
+            } else if (isa<Variadic>(expr1)) {
+                const Variadic * const var1 = cast<Variadic>(expr1);
+                const Variadic * const var2 = cast<Variadic>(expr2);
+                if (var1->getNumOperands() == var2->getNumOperands()) {
+                    const unsigned operands = var1->getNumOperands();
+                    for (unsigned i = 0; i != operands; ++i) {
+                        bool missing = true;
+                        for (unsigned j = 0; j != operands; ++j) {
+                            // odds are both variadics will be sorted; optimize towards testing them in order.
+                            unsigned k = i + j;
+                            if (LLVM_UNLIKELY(k >= operands)) {
+                                k -= operands;
+                            }
+                            if (equals(var1->getOperand(i), var2->getOperand(k))) {
+                                missing = false;
+                                break;
+                            }
+                        }
+                        if (missing) {
+                            return false;
+                        }
+                    }
+                    return true;
                 }
-                op2[0] = cast<Statement>(expr2)->getOperand(0);
-                op2[1] = cast<Statement>(expr2)->getOperand(1);
-                if (op2[1] < op2[0]) {
-                    std::swap(op2[0], op2[1]);
-                }
-                return (op1[0] == op2[0]) && (op1[1] == op2[1]);
             } else if (isa<Statement>(expr1)) {
                 const Statement * stmt1 = cast<Statement>(expr1);
                 const Statement * stmt2 = cast<Statement>(expr2);
@@ -84,7 +89,7 @@ bool equals(const PabloAST * const expr1, const PabloAST * const expr2) noexcept
 /** ------------------------------------------------------------------------------------------------------------- *
  * @brief replaceAllUsesWith
  ** ------------------------------------------------------------------------------------------------------------- */
-void PabloAST::replaceAllUsesWith(PabloAST * const expr) noexcept {
+void PabloAST::replaceAllUsesWith(PabloAST * const expr) {
     assert (expr);
     if (LLVM_UNLIKELY(this == expr)) {
         return;
@@ -108,8 +113,7 @@ void PabloAST::replaceAllUsesWith(PabloAST * const expr) noexcept {
 /** ------------------------------------------------------------------------------------------------------------- *
  * @brief addUser
  ** ------------------------------------------------------------------------------------------------------------- */
-bool PabloAST::addUser(PabloAST * const user) noexcept {
-    assert (user);
+bool PabloAST::addUser(PabloAST * const user) { assert (user);
     const auto p = std::lower_bound(mUsers.begin(), mUsers.end(), user);
     const bool unique = p == mUsers.end() || *p != user;
     mUsers.insert(p, user);
@@ -119,8 +123,7 @@ bool PabloAST::addUser(PabloAST * const user) noexcept {
 /** ------------------------------------------------------------------------------------------------------------- *
  * @brief removeUser
  ** ------------------------------------------------------------------------------------------------------------- */
-bool PabloAST::removeUser(PabloAST * const user) noexcept {
-    assert (user);
+bool PabloAST::removeUser(PabloAST * const user) { assert (user);
     const auto p = std::lower_bound(mUsers.begin(), mUsers.end(), user);
     assert (p != mUsers.end() && *p == user);
     const auto n = mUsers.erase(p);
@@ -132,61 +135,6 @@ bool PabloAST::removeUser(PabloAST * const user) noexcept {
  ** ------------------------------------------------------------------------------------------------------------- */
 void PabloAST::print(llvm::raw_ostream & O) const {
     PabloPrinter::print(this, O);
-}
-
-/** ------------------------------------------------------------------------------------------------------------- *
- * @brief setName
- ** ------------------------------------------------------------------------------------------------------------- */
-void NamedPabloAST::setName(const String * const name) {
-    if (LLVM_UNLIKELY(name == nullptr)) {
-        llvm::report_fatal_error("name cannot be null");
-    }
-    mName = name;
-}
-
-/** ------------------------------------------------------------------------------------------------------------- *
- * @brief getName
- ** ------------------------------------------------------------------------------------------------------------- */
-const String & Statement::getName() const {
-    if (mName == nullptr) {
-        if (LLVM_UNLIKELY(mParent == nullptr)) {
-            llvm::report_fatal_error("cannot assign a default name to a statement that is not within a PabloBlock");
-        }
-        const char * prefix = nullptr;
-        size_t length = 0;
-        #define MAKE_PREFIX(type_id, name) \
-            case ClassTypeId:: type_id : prefix = name; length = __length(name); break
-        switch (mClassTypeId) {
-            // Boolean operations
-            MAKE_PREFIX(And, "and");
-            MAKE_PREFIX(Or, "or");
-            MAKE_PREFIX(Xor, "xor");
-            MAKE_PREFIX(Not, "not");
-            MAKE_PREFIX(Sel, "sel");
-            // Stream operations
-            MAKE_PREFIX(Advance, "advance");
-            MAKE_PREFIX(IndexedAdvance, "indexed_advance");
-            MAKE_PREFIX(ScanThru, "scanthru");
-            MAKE_PREFIX(AdvanceThenScanThru, "advscanthru");
-            MAKE_PREFIX(ScanTo, "scanto");
-            MAKE_PREFIX(AdvanceThenScanTo, "advscanto");
-            MAKE_PREFIX(Lookahead, "lookahead");
-            MAKE_PREFIX(MatchStar, "matchstar");
-            MAKE_PREFIX(InFile, "inFile");
-            MAKE_PREFIX(AtEOF, "atEOF");
-            // Statistics operations
-            MAKE_PREFIX(Count, "count");
-            // Misc. operations
-            MAKE_PREFIX(Repeat, "repeat");
-            MAKE_PREFIX(PackH, "packh");
-            MAKE_PREFIX(PackL, "packl");
-            default: llvm_unreachable("invalid statement type");
-        }
-        #undef MAKE_PREFIX
-        const StringRef __prefix(prefix, length);
-        mName = mParent->makeName(__prefix);
-    }
-    return *mName;
 }
 
 /** ------------------------------------------------------------------------------------------------------------- *
@@ -280,9 +228,12 @@ void Statement::insertAfter(Statement * const statement) {
 /** ------------------------------------------------------------------------------------------------------------- *
  * @brief removeFromParent
  ** ------------------------------------------------------------------------------------------------------------- */
-Statement * Statement::removeFromParent() noexcept {
+Statement * Statement::removeFromParent() {
     Statement * next = mNext;
     if (LLVM_LIKELY(mParent != nullptr)) {
+
+
+
         if (LLVM_UNLIKELY(mParent->mFirst == this)) {
             mParent->mFirst = mNext;
         }
@@ -308,7 +259,7 @@ Statement * Statement::removeFromParent() noexcept {
 /** ------------------------------------------------------------------------------------------------------------- *
  * @brief eraseFromParent
  ** ------------------------------------------------------------------------------------------------------------- */
-Statement * Statement::eraseFromParent(const bool recursively) noexcept {
+Statement * Statement::eraseFromParent(const bool recursively) {
 
     if (LLVM_UNLIKELY(getParent() == nullptr)) {
         return nullptr;
@@ -321,6 +272,7 @@ Statement * Statement::eraseFromParent(const bool recursively) noexcept {
     }
 
     Statement * const next = removeFromParent();
+
     for (unsigned i = 0; i != mOperands; ++i) {
         PabloAST * const op = mOperand[i]; assert (op);
         op->removeUser(this);
@@ -338,15 +290,14 @@ Statement * Statement::eraseFromParent(const bool recursively) noexcept {
 /** ------------------------------------------------------------------------------------------------------------- *
  * @brief replaceWith
  ** ------------------------------------------------------------------------------------------------------------- */
-Statement * Statement::replaceWith(PabloAST * const expr, const bool rename, const bool recursively) noexcept {
+Statement * Statement::replaceWith(PabloAST * const expr, const bool rename, const bool recursively) {
     assert (expr);
     if (LLVM_UNLIKELY(expr == this)) {
         return getNextNode();
     }
-    if (LLVM_UNLIKELY(mName && rename)) {
-        if (LLVM_LIKELY(isa<Statement>(expr) && cast<Statement>(expr)->mName == nullptr)) {
+    if (LLVM_LIKELY(rename && isa<Statement>(expr))) {
+        if (mName && cast<Statement>(expr)->mName == nullptr) {
             cast<Statement>(expr)->setName(mName);
-            mName = nullptr;
         }
     }
     replaceAllUsesWith(expr);
@@ -354,10 +305,53 @@ Statement * Statement::replaceWith(PabloAST * const expr, const bool rename, con
 }
 
 /** ------------------------------------------------------------------------------------------------------------- *
+ * @brief setName
+ ** ------------------------------------------------------------------------------------------------------------- */
+void Statement::setName(const String * const name) noexcept {
+    if (LLVM_UNLIKELY(name == nullptr)) {
+        llvm::report_fatal_error("Statement name cannot be null!");
+    }
+    mName = name;
+}
+
+/** ------------------------------------------------------------------------------------------------------------- *
+ * @brief addOperand
+ ** ------------------------------------------------------------------------------------------------------------- */
+void Variadic::addOperand(PabloAST * const expr) {
+    if (LLVM_UNLIKELY(mOperands == mCapacity)) {
+        mCapacity = std::max<unsigned>(mCapacity * 2, 2);
+        PabloAST ** expandedOperandSpace = mAllocator.allocate(mCapacity);
+        for (unsigned i = 0; i != mOperands; ++i) {
+            expandedOperandSpace[i] = mOperand[i];
+        }
+        mAllocator.deallocate(mOperand);
+        mOperand = expandedOperandSpace;
+    }
+    mOperand[mOperands++] = expr;
+    expr->addUser(this);
+}
+
+/** ------------------------------------------------------------------------------------------------------------- *
+ * @brief removeOperand
+ ** ------------------------------------------------------------------------------------------------------------- */
+PabloAST * Variadic::removeOperand(const unsigned index) {
+    assert (index < mOperands);
+    PabloAST * const expr = mOperand[index];
+    assert (expr);
+    --mOperands;
+    for (unsigned i = index; i != mOperands; ++i) {
+        mOperand[i] = mOperand[i + 1];
+    }
+    mOperand[mOperands] = nullptr;
+    expr->removeUser(this);
+    return expr;
+}
+
+/** ------------------------------------------------------------------------------------------------------------- *
  * @brief contains
  ** ------------------------------------------------------------------------------------------------------------- */
-bool StatementList::contains(const Statement * const statement) const noexcept {
-    for (const Statement * stmt : *this) {
+bool StatementList::contains(Statement * const statement) {
+    for (Statement * stmt : *this) {
         if (statement == stmt) {
             return true;
         }
@@ -379,7 +373,7 @@ bool StatementList::contains(const Statement * const statement) const noexcept {
  * 5.   Assign a, q         5 >> 5
  * 6. Assign a, t           6 >> 6
  ** ------------------------------------------------------------------------------------------------------------- */
-bool dominates(const PabloAST * const expr1, const PabloAST * const expr2) noexcept {
+bool dominates(const PabloAST * const expr1, const PabloAST * const expr2) {
     if (LLVM_UNLIKELY(expr1 == nullptr || expr2 == nullptr)) {
         return (expr2 == nullptr);
     } else if (LLVM_LIKELY(isa<Statement>(expr1))) {
@@ -428,7 +422,7 @@ bool dominates(const PabloAST * const expr1, const PabloAST * const expr2) noexc
  * 5.   Assign a, q         5 << 1, 2, 4, 5
  * 6. Assign a, t           6 << 1, 2, 3, 4, 5, 6
  ** ------------------------------------------------------------------------------------------------------------- */
-bool postdominates(const PabloAST * const expr1, const PabloAST * const expr2) noexcept {
+bool postdominates(const PabloAST * const expr1, const PabloAST * const expr2) {
     throw std::runtime_error("not implemented yet!");
 }
 

@@ -36,7 +36,7 @@ void FlattenIf::flattenIf(PabloBlock * const block) {
  * @brief transform
  ** ------------------------------------------------------------------------------------------------------------- */
 void FlattenIf::transform(PabloKernel * function) {
-    flattenIf(function->getEntryScope());
+    flattenIf(function->getEntryBlock());
     #ifndef NDEBUG
     PabloVerifier::verify(function, "flatten-if");
     #endif

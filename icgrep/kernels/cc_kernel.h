@@ -12,18 +12,20 @@ namespace re { class CC; }
 
 namespace kernel {
 
-class DirectCharacterClassKernelBuilder final : public pablo::PabloKernel {
+class DirectCharacterClassKernelBuilder final : public BlockOrientedKernel {
 public:    
-    DirectCharacterClassKernelBuilder(const std::unique_ptr<KernelBuilder> & b, std::string ccSetName, std::vector<re::CC *> charClasses);
-protected:
-    void generatePabloMethod() override;
+    DirectCharacterClassKernelBuilder(const std::unique_ptr<KernelBuilder> & b, std::string ccSetName, std::vector<re::CC *> charClasses, unsigned codeUnitSize);
+    void generateDoBlockMethod(const std::unique_ptr<KernelBuilder> & iBuilder) override;
+    bool isCachable() const override { return true;}
 private:
     const std::vector<re::CC *> mCharClasses;
+    const unsigned              mCodeUnitSize;
+    
 };
 
 class ParabixCharacterClassKernelBuilder final : public pablo::PabloKernel {
 public:
-    ParabixCharacterClassKernelBuilder(const std::unique_ptr<KernelBuilder> & b, std::string ccSetName, const std::vector<re::CC *> & charClasses, unsigned codeUnitWidth);
+    ParabixCharacterClassKernelBuilder(const std::unique_ptr<KernelBuilder> & b, std::string ccSetName, const std::vector<re::CC *> & charClasses, unsigned codeUnitSize);
 protected:
     void generatePabloMethod() override;
 private:

@@ -8,10 +8,6 @@
 #define ALT_H
 
 #include "re_re.h"
-#include <re/re_cc.h>
-#include <re/re_seq.h>
-#include <re/re_rep.h>
-#include <re/printer_re.h>
 #include <llvm/Support/Casting.h>
 
 namespace re {
@@ -35,6 +31,17 @@ protected:
     : Vector(ClassTypeId::Alt, begin, end) {
 
     }
+private:
+    template<typename iterator>
+    void flatten(iterator begin, iterator end) {
+        for (auto i = begin; i != end; ++i) {
+            if (LLVM_UNLIKELY(llvm::isa<Alt>(*i))) {
+                flatten<Alt::iterator>(llvm::cast<Alt>(*i)->begin(), llvm::cast<Alt>(*i)->end());
+            } else {
+                push_back(*i);
+            }
+        }
+    }
 };
 
 /**
@@ -50,85 +57,27 @@ protected:
 inline Alt * makeAlt() {
     return new Alt();
 }
-    
+
 template<typename iterator>
 RE * makeAlt(iterator begin, iterator end) {
-    Alt * newAlt = makeAlt();
-    if (LLVM_UNLIKELY(begin == end)) {
-        return newAlt;
-    }
-
-    llvm::SmallVector<CC *, 2> CCs(0); // CCs with possibly different alphabets
-    auto combineCC = [&CCs] (CC * cc) {
-        for (CC *& existing : CCs) {
-            if (LLVM_LIKELY(existing->getAlphabet() == cc->getAlphabet())) {
-                existing = makeCC(existing, cc);
-                return;
-            }
+    if (LLVM_UNLIKELY(std::distance(begin, end) == 0)) {
+        throw std::runtime_error("Alt objects cannot be empty!");
+    } else if (std::distance(begin, end) == 1) {
+        return *begin;
+    } else {
+        Alt * alt = makeAlt();
+        alt->flatten(begin, end);
+        if (alt->size() == 1) {
+            return alt->front();
         }
-        CCs.push_back(cc);
-    };
-
-    bool nullable = false;
-    RE * nullableSeq = nullptr;
-    for (auto i = begin; i != end; ++i) {
-        if (CC * cc = llvm::dyn_cast<CC>(*i)) {
-            combineCC(cc);
-        } else if (const Alt * alt = llvm::dyn_cast<Alt>(*i)) {
-            // We have an Alt to embed within the alt.  We extract the individual
-            // elements to include within the new alt.   Note that recursive flattening
-            // is not required, if the elements themselves were created with makeAlt.
-            for (RE * a : *alt) {
-                if (CC * cc = llvm::dyn_cast<CC>(a)) {
-                    combineCC(cc);
-                } else if (isEmptySeq(a) && !nullable) {
-                    nullable = true;
-                    nullableSeq = a;
-                } else {
-                    newAlt->push_back(a);
-                }
-            }
-        } else if (const Rep * rep = llvm::dyn_cast<Rep>(*i)) {
-            if (rep->getLB() == 0) {
-                if (nullable) {
-                    // Already have a nullable case.
-                    newAlt->push_back(makeRep(rep->getRE(), 1, rep->getUB()));
-                }
-                else {
-                    // This will be the nullable case.
-                    nullableSeq = *i;
-                    nullable = true;
-                }
-            } else {
-                newAlt->push_back(*i);
-            }
-        } else if (isEmptySeq(*i)) {
-            if (!nullable) {
-                nullable = true;
-                nullableSeq = *i;
-            }
-        } else {
-            newAlt->push_back(*i);
-        }
+        return alt;
     }
-    newAlt->insert(newAlt->end(), CCs.begin(), CCs.end());
-    if (nullable) {
-        if (nullableSeq == nullptr) {
-            nullableSeq = makeSeq();
-        }
-        newAlt->push_back(nullableSeq);
-    }
-    return newAlt->size() == 1 ? newAlt->front() : newAlt;
 }
 
 inline RE * makeAlt(RE::InitializerList list) {
     return makeAlt(list.begin(), list.end());
 }
 
-// An Alt with no members represent the empty set.
-inline bool isEmptySet(RE * r) {
-    return llvm::isa<Alt>(r) && llvm::cast<Alt>(r)->empty();
-}
 }
 
 #endif // ALT_H

@@ -1,14 +1,14 @@
 #ifndef RE_NAME_GATHER_H
 #define RE_NAME_GATHER_H
 
-#include <string>
-#include <set>
+#include <UCD/ucd_compiler.hpp>
 
 namespace re {
 
-    class RE; class Name;
+    class RE;
+    class Name;
 
-    void gatherUnicodeProperties (RE * r, std::set<Name *> & nameSet);
+    UCD::UCDCompiler::NameMap gatherNames(RE * &re, Name * &zerowidth);
 
 }
 #endif

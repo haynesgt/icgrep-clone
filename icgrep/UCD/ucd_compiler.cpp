@@ -1,17 +1,15 @@
 #include "ucd_compiler.hpp"
-#include <cc/alphabet.h>
 #include <cc/cc_compiler.h>
 #include <UCD/unicode_set.h>
 #include <re/re_name.h>
-#include <re/re_cc.h>
 #include <utf8_encoder.h>
 #include <utf16_encoder.h>
 #include <array>
 #include <pablo/pe_var.h>
 #include <pablo/pe_zeroes.h>
 #include <pablo/pe_ones.h>
+
 #include <pablo/printer_pablos.h>
-#include <llvm/Support/ErrorHandling.h>
 #include <llvm/Support/raw_ostream.h>
 
 using namespace cc;
@@ -145,9 +143,9 @@ const UCDCompiler::RangeList UCDCompiler::noIfHierachy = {{0x80, 0x10FFFF}};
 void UCDCompiler::generateRange(const RangeList & ifRanges, PabloBuilder & entry) {
     // Pregenerate the suffix var outside of the if ranges. The DCE pass will either eliminate it if it's not used or the
     // code sinking pass will move appropriately into an inner if block.
-    CC *  suffix = makeByte(0x80, 0xBF);
+    CC *  suffix = makeCC(0x80, 0xBF);
     assert (!suffix->empty());
-    mSuffixVar = mCodeUnitCompiler.compileCC(suffix, entry);
+    mSuffixVar = mCharacterClassCompiler.compileCC(suffix, entry);
     generateRange(ifRanges, 0, UNICODE_MAX, entry);
 }
 
@@ -200,7 +198,7 @@ void UCDCompiler::generateRange(const RangeList & ifRanges, const codepoint_t lo
             }
         }
         if (mTargetValue.size() > 0) {
-            auto inner_block = builder.createScope();
+            PabloBuilder inner_block = PabloBuilder::Create(builder);
             builder.createIf(ifTestCompiler(range.first, range.second, builder), inner_block);
             generateRange(inner, range.first, range.second, inner_block);
         }
@@ -239,7 +237,7 @@ void UCDCompiler::generateSubRanges(const codepoint_t lo, const codepoint_t hi, 
  * matching the sequences up to byte number byte_no have been generated.
  ** ------------------------------------------------------------------------------------------------------------- */
 PabloAST * UCDCompiler::sequenceGenerator(const RangeList && ranges, const unsigned byte_no, PabloBuilder & builder, PabloAST * target, PabloAST * prefix) {
-    bool isUTF_16 = false;
+	bool isUTF_16 = mCharacterClassCompiler.isUTF_16();
 
     if (LLVM_LIKELY(ranges.size() > 0)) {
 
@@ -256,7 +254,7 @@ PabloAST * UCDCompiler::sequenceGenerator(const RangeList && ranges, const unsig
         } else if (min == byte_no) {
             // We have a single byte remaining to match for all code points in this CC.
             // Use the byte class compiler to generate matches for these codepoints.
-            PabloAST * var = mCodeUnitCompiler.compileCC(makeCC(byteDefinitions(ranges, byte_no, isUTF_16), &Byte), builder);
+            PabloAST * var = mCharacterClassCompiler.compileCC(makeCC(byteDefinitions(ranges, byte_no, isUTF_16)), builder);
             if (byte_no > 1) {
                 var = builder.createAnd(var, builder.createAdvance(makePrefix(lo, byte_no, builder, prefix), 1));
             }
@@ -278,7 +276,7 @@ PabloAST * UCDCompiler::sequenceGenerator(const RangeList && ranges, const unsig
                         target = sequenceGenerator(lo, mid - 1, byte_no, builder, target, prefix);
                         target = sequenceGenerator(mid, hi, byte_no, builder, target, prefix);
                     } else { // we have a prefix group of type (a)
-                        PabloAST * var = mCodeUnitCompiler.compileCC(makeByte(lo_byte, hi_byte), builder);
+                        PabloAST * var = mCharacterClassCompiler.compileCC(makeCC(lo_byte, hi_byte), builder);
                         if (byte_no > 1) {
                             var = builder.createAnd(builder.createAdvance(prefix, 1), var);
                         }
@@ -288,7 +286,7 @@ PabloAST * UCDCompiler::sequenceGenerator(const RangeList && ranges, const unsig
                         target = builder.createOr(target, var);
                     }
                 } else { // lbyte == hbyte
-                    PabloAST * var = mCodeUnitCompiler.compileCC(makeByte(lo_byte, hi_byte), builder);
+                    PabloAST * var = mCharacterClassCompiler.compileCC(makeCC(lo_byte, hi_byte), builder);
                     if (byte_no > 1) {
                         var = builder.createAnd(builder.createAdvance(prefix ? prefix : var, 1), var);
                     }
@@ -321,7 +319,7 @@ inline PabloAST * UCDCompiler::ifTestCompiler(const codepoint_t lo, const codepo
  ** ------------------------------------------------------------------------------------------------------------- */
 PabloAST * UCDCompiler::ifTestCompiler(const codepoint_t lo, const codepoint_t hi, const unsigned byte_no, PabloBuilder & builder, PabloAST * target) {
 
-	bool isUTF_16 = false;
+	bool isUTF_16 = mCharacterClassCompiler.isUTF_16();
     codepoint_t lo_byte = encodingByte(lo, byte_no, isUTF_16);
     codepoint_t hi_byte = encodingByte(hi, byte_no, isUTF_16);
     const bool at_lo_boundary = (lo == 0 || encodingByte(lo - 1, byte_no, isUTF_16) != lo_byte);
@@ -334,10 +332,10 @@ PabloAST * UCDCompiler::ifTestCompiler(const codepoint_t lo, const codepoint_t h
 		if (hi == 0x10FFFF) hi_byte = 0xFF;
 	    }
 	}
-        PabloAST * cc = mCodeUnitCompiler.compileCC(makeByte(lo_byte, hi_byte), builder);
+        PabloAST * cc = mCharacterClassCompiler.compileCC(makeCC(lo_byte, hi_byte), builder);
         target = builder.createAnd(cc, target);
     } else if (lo_byte == hi_byte) {
-        PabloAST * cc = mCodeUnitCompiler.compileCC(makeByte(lo_byte, hi_byte), builder);
+        PabloAST * cc = mCharacterClassCompiler.compileCC(makeCC(lo_byte, hi_byte), builder);
         target = builder.createAnd(cc, target);
         target = builder.createAdvance(target, 1);
         target = ifTestCompiler(lo, hi, byte_no + 1, builder, target);
@@ -365,10 +363,10 @@ PabloAST * UCDCompiler::ifTestCompiler(const codepoint_t lo, const codepoint_t h
 PabloAST * UCDCompiler::makePrefix(const codepoint_t cp, const unsigned byte_no, PabloBuilder & builder, PabloAST * prefix) {
     assert (byte_no >= 1 && byte_no <= 4);
     assert (byte_no == 1 || prefix != nullptr);
-    bool isUTF_16 = false;
+    bool isUTF_16 = mCharacterClassCompiler.isUTF_16();
     for (unsigned i = 1; i != byte_no; ++i) {
-        const CC * const cc = makeByte(encodingByte(cp, i, isUTF_16));
-        PabloAST * var = mCodeUnitCompiler.compileCC(cc, builder);
+        const CC * const cc = makeCC(encodingByte(cp, i, isUTF_16));
+        PabloAST * var = mCharacterClassCompiler.compileCC(cc, builder);
         if (i > 1) {
             var = builder.createAnd(var, builder.createAdvance(prefix, 1));
         }
@@ -512,10 +510,12 @@ inline void UCDCompiler::makeTargets(PabloBuilder & entry, NameMap & names) {
 
     for (auto & t : names) {
         Name * const name = t.first;
+        if (name->getType() == Name::Type::Byte) {
+            continue;
+        }        
         CC * const cc = dyn_cast<CC>(name->getDefinition());
-        if (cc && (cc->getAlphabet() == &cc::Unicode)) {
+        if (cc) {            
             const auto f = CCs.find(cc);
-            // This check may not be needed. Memoization ought to detect duplicate classes earlier.
             if (LLVM_LIKELY(f == CCs.end())) {
                 PabloAST * const value = t.second ? t.second : zeroes;
                 mTargetValue.emplace(cc, value);
@@ -527,7 +527,7 @@ inline void UCDCompiler::makeTargets(PabloBuilder & entry, NameMap & names) {
                 t.second = f->second;
             }
         } else {
-            report_fatal_error(name->getName() + " is not defined by a Unicode CC!");
+            report_fatal_error(name->getName() + " is not defined by a CC!");
         }
     }
 }
@@ -536,7 +536,7 @@ inline void UCDCompiler::makeTargets(PabloBuilder & entry, NameMap & names) {
  * @brief constructor
  ** ------------------------------------------------------------------------------------------------------------- */
 UCDCompiler::UCDCompiler(cc::CC_Compiler & ccCompiler)
-: mCodeUnitCompiler(ccCompiler)
+: mCharacterClassCompiler(ccCompiler)
 , mSuffixVar(nullptr) { }
 
 }

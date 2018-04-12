@@ -22,6 +22,7 @@ public:
     virtual std::string getBuilderUniqueName() override;
     llvm::Value * hsimd_signmask(unsigned fw, llvm::Value * a) override;
     ~IDISA_SSE_Builder() {}
+
 };
 
 class IDISA_SSE2_Builder : public IDISA_SSE_Builder {
@@ -38,7 +39,9 @@ public:
     llvm::Value * hsimd_packh(unsigned fw, llvm::Value * a, llvm::Value * b) override;
     llvm::Value * hsimd_packl(unsigned fw, llvm::Value * a, llvm::Value * b) override;
     std::pair<llvm::Value *, llvm::Value *> bitblock_advance(llvm::Value * a, llvm::Value * shiftin, unsigned shift) final;
+
     ~IDISA_SSE2_Builder() {}
+
 };
 
 }

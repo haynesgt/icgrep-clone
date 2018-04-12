@@ -11,10 +11,9 @@
 #include <pablo/symbol_generator.h>
 #include <util/slab_allocator.h>
 #include <llvm/ADT/StringRef.h>
+#include <boost/container/flat_map.hpp>
 
 namespace llvm { class Type; }
-namespace llvm { class VectorType; }
-
 namespace pablo { class Integer; }
 namespace pablo { class Ones; }
 namespace pablo { class PabloBlock; }
@@ -31,7 +30,6 @@ class PabloKernel : public kernel::BlockOrientedKernel, public PabloAST {
     friend class PabloBlock;
     friend class CarryManager;
     friend class CarryPackManager;
-    friend class ParabixObjectCache;
 
 public:
 
@@ -51,29 +49,27 @@ public:
 
     virtual ~PabloKernel();
 
-    PabloBlock * getEntryScope() const {
-        return mEntryScope;
+    PabloBlock * getEntryBlock() const {
+        return mEntryBlock;
     }
 
-    PabloBlock * setEntryScope(PabloBlock * entryBlock) {
+    PabloBlock * setEntryBlock(PabloBlock * entryBlock) {
         assert (entryBlock);
-        std::swap(mEntryScope, entryBlock);
+        std::swap(mEntryBlock, entryBlock);
         return entryBlock;
     }
     
     Var * getInputStreamVar(const std::string & name);
-    
-    std::vector<PabloAST *> getInputStreamSet(const std::string & name);
 
     Var * getInput(const unsigned index) {
-        assert (index < mInputs.size() && mInputs[index]);
         return mInputs[index];
     }
 
     const Var * getInput(const unsigned index) const {
-        assert (index < mInputs.size() && mInputs[index]);
         return mInputs[index];
     }
+
+    Var * addInput(const std::string & name, llvm::Type * const type);
 
     unsigned getNumOfInputs() const {
         return mInputs.size();
@@ -84,21 +80,22 @@ public:
     Var * getOutputScalarVar(const std::string & name);
 
     Var * getOutput(const unsigned index) {
-        assert (index < mOutputs.size() && mOutputs[index]);
         return mOutputs[index];
     }
 
     const Var * getOutput(const unsigned index) const {
-        assert (index < mOutputs.size() && mOutputs[index]);
         return mOutputs[index];
     }
+
+    Var * addOutput(const std::string & name, llvm::Type * const type);
 
     unsigned getNumOfOutputs() const {
         return mOutputs.size();
     }
 
+    Var * makeVariable(String * name, llvm::Type * const type);
+
     Var * getVariable(const unsigned index) {
-        assert (index < mVariables.size() && mVariables[index]);
         return mVariables[index];
     }
 
@@ -126,23 +123,14 @@ public:
 
     Integer * getInteger(const int64_t value) const;
 
-    llvm::StructType * getCarryDataTy() const {
-        return mCarryDataTy;
-    }
-
-    llvm::LLVMContext & getContext() const {
-        assert (mContext);
-        return *mContext;
-    }
-
 protected:
 
     PabloKernel(const std::unique_ptr<kernel::KernelBuilder> & builder,
                 std::string && kernelName,
-                std::vector<kernel::Binding> stream_inputs = {},
-                std::vector<kernel::Binding> stream_outputs = {},
-                std::vector<kernel::Binding> scalar_parameters = {},
-                std::vector<kernel::Binding> scalar_outputs = {});
+                std::vector<Binding> stream_inputs = {},
+                std::vector<Binding> stream_outputs = {},
+                std::vector<Binding> scalar_parameters = {},
+                std::vector<Binding> scalar_outputs = {});
 
     virtual void generatePabloMethod() = 0;
 
@@ -156,18 +144,12 @@ protected:
 
     llvm::IntegerType * getInt1Ty() const;
 
-    void setCarryDataTy(llvm::StructType * const carryDataTy) {
-        mCarryDataTy = carryDataTy;
-    }
-
-    Var * makeVariable(const String * name, llvm::Type * const type);
+private:
 
     // A custom method for preparing kernel declarations is needed,
     // so that the carry data requirements may be accommodated before
     // finalizing the KernelStateType.
-    void addInternalKernelProperties(const std::unique_ptr<kernel::KernelBuilder> & iBuilder) final;
-
-private:
+    void prepareKernel(const std::unique_ptr<kernel::KernelBuilder> & iBuilder) final;
 
     void generateDoBlockMethod(const std::unique_ptr<KernelBuilder> & iBuilder) final;
 
@@ -178,26 +160,19 @@ private:
 
     void generateFinalizeMethod(const std::unique_ptr<kernel::KernelBuilder> & iBuilder) final;
 
-    #if 0
-    void beginConditionalRegion(const std::unique_ptr<KernelBuilder> & b) final;
-    #endif
-
 private:
 
     Allocator                       mAllocator;
-    PabloCompiler *                 mPabloCompiler;
+    PabloCompiler * const           mPabloCompiler;
     SymbolGenerator *               mSymbolTable;
-    PabloBlock *                    mEntryScope;
+    PabloBlock *                    mEntryBlock;
     llvm::IntegerType *             mSizeTy;
     llvm::VectorType *              mStreamTy;
-    llvm::StructType *              mCarryDataTy;
-    llvm::LLVMContext *             mContext;
-
     std::vector<Var *>              mInputs;
     std::vector<Var *>              mOutputs;
     std::vector<PabloAST *>         mConstants;
     std::vector<Var *>              mVariables;
-    std::vector<Var *>              mScalarOutputVars;
+    boost::container::flat_map<std::string, Var *> mScalarOutputNameMap;
 };
 
 }

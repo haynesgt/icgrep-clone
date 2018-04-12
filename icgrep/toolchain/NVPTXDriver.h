@@ -30,8 +30,6 @@ private:
 
     llvm::Function * addLinkFunction(llvm::Module * mod, llvm::StringRef name, llvm::FunctionType * type, void * functionPtr) const override;
 
-    void performIncrementalCacheCleanupStep() override { };
-
 };
 
 #endif

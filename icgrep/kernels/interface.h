@@ -6,102 +6,78 @@
 #ifndef KERNEL_INTERFACE_H
 #define KERNEL_INTERFACE_H
 
-#include <kernels/processing_rate.h>
-#include <kernels/attributes.h>
-#include <llvm/Support/Compiler.h>
-#include <memory>
+#include <llvm/IR/Constants.h>
 #include <string>
 #include <vector>
 
 namespace IDISA { class IDISA_Builder; }
 namespace kernel { class Kernel; }
 namespace kernel { class KernelBuilder; }
-namespace llvm { class CallInst; }
-namespace llvm { class Function; }
-namespace llvm { class Value; }
-namespace llvm { class Module; }
-namespace llvm { class StructType; }
-namespace llvm { class Type; }
 
-namespace kernel {
+// Processing rate attributes are required for all stream set bindings for a kernel.
+// These attributes describe the number of items that are processed or produced as
+// a ratio in comparison to a reference stream set, normally the principal input stream set 
+// by default (or the principal output stream set if there is no input).
+//
+// The default ratio is FixedRatio(1) which means that there is one item processed or
+// produced for every item of the reference stream.
+// FixedRatio(m, n) means that for every group of n items of the refrence stream,
+// there are m items in the output stream (rounding up).
+// 
+// Kernels which produce a variable number of items use MaxRatio(n), for a maximum
+// of n items produced or consumed per principal input or output item.  MaxRatio(m, n)
+// means there are at most m items for every n items of the reference stream.
+//
+// RoundUpToMultiple(n) means that number of items produced is the same as the
+// number of reference items, rounded up to an exact multiple of n.
+// 
 
-struct Binding : public AttributeSet {
-
-    Binding(llvm::Type * type, const std::string & name, ProcessingRate r = FixedRate(1))
-    : AttributeSet()
-    , mType(type), mName(name), mRate(std::move(r)) { }
-
-
-    Binding(llvm::Type * type, const std::string & name, ProcessingRate r, Attribute && attribute)
-    : AttributeSet(std::move(attribute))
-    , mType(type), mName(name), mRate(std::move(r)) { }
-
-
-    Binding(llvm::Type * type, const std::string & name, ProcessingRate r, std::initializer_list<Attribute> attributes)
-    : AttributeSet(attributes)
-    , mType(type), mName(name), mRate(std::move(r)) { }
-
-    llvm::Type * getType() const {
-        return mType;
-    }
-
-    const std::string & getName() const {
-        return mName;
-    }
-
-    const ProcessingRate & getRate() const {
-        return mRate;
-    }
-
-    ProcessingRate & getRate() {
-        return mRate;
-    }
-
-    bool isPrincipal() const {
-        return hasAttribute(AttributeId::Principal);
-    }
-
-    bool hasLookahead() const {
-        return hasAttribute(AttributeId::LookAhead);
-    }
-
-    bool isMisaligned() const {
-        return hasAttribute(AttributeId::Misaligned);
-    }
-
-    bool isSwizzled() const {
-        return hasAttribute(AttributeId::Swizzled);
-    }
-
-    bool isDisableTemporaryBuffer() const {
-        return hasAttribute(AttributeId::DisableTemporaryBuffer);
-    }
-
-    bool isDisableSufficientChecking() const {
-        return hasAttribute(AttributeId::DisableSufficientChecking);
-    }
-
-    bool isDisableAvailableItemCountAdjustment() const {
-        return hasAttribute(AttributeId::DisableAvailableItemCountAdjustment);
-    }
-
-    unsigned const getLookahead() const {
-        return findAttribute(AttributeId::LookAhead).amount();
-    }
-
-    bool nonDeferred() const {
-        return !hasAttribute(AttributeId::Deferred);
-    }
-
+struct ProcessingRate  {
+    friend class kernel::Kernel;
+    enum class ProcessingRateKind : uint8_t { FixedRatio, RoundUp, Add1, MaxRatio, Unknown };
+    ProcessingRateKind getKind() const {return mKind;}
+    bool isFixedRatio() const {return mKind == ProcessingRateKind::FixedRatio;}
+    bool isMaxRatio() const {return mKind == ProcessingRateKind::MaxRatio;}
+    bool isExact() const {return (mKind == ProcessingRateKind::FixedRatio)||(mKind == ProcessingRateKind::RoundUp)||(mKind == ProcessingRateKind::Add1) ;}
+    bool isUnknownRate() const { return mKind == ProcessingRateKind::Unknown; }
+    unsigned calculateRatio(unsigned referenceItems, bool doFinal = false) const;
+    unsigned calculateMaxReferenceItems(unsigned outputItems, bool doFinal = false) const;
+    llvm::Value * CreateRatioCalculation(IDISA::IDISA_Builder * const b, llvm::Value * referenceItems, llvm::Value * doFinal = nullptr) const;
+    llvm::Value * CreateMaxReferenceItemsCalculation(IDISA::IDISA_Builder * const b, llvm::Value * outputItems, llvm::Value * doFinal = nullptr) const;
+    friend ProcessingRate FixedRatio(unsigned strmItems, unsigned referenceItems, std::string && referenceStreamSet);
+    friend ProcessingRate MaxRatio(unsigned strmItems, unsigned referenceItems, std::string && referenceStreamSet);
+    friend ProcessingRate RoundUpToMultiple(unsigned itemMultiple, std::string && referenceStreamSet);
+    friend ProcessingRate Add1(std::string && referenceStreamSet);
+    friend ProcessingRate UnknownRate();
+    uint16_t getRatioNumerator() const { return mRatioNumerator;}
+    uint16_t getRatioDenominator() const { return mRatioDenominator;}
+    const std::string & referenceStreamSet() const { return mReferenceStreamSet;}
+protected:
+    ProcessingRate(ProcessingRateKind k, unsigned numerator, unsigned denominator, std::string && referenceStreamSet)
+    : mKind(k), mRatioNumerator(numerator), mRatioDenominator(denominator), mReferenceStreamSet(referenceStreamSet) {}
+    void setReferenceStreamSet(const std::string & s) {mReferenceStreamSet = s;}
 private:
-    llvm::Type * const          mType;
-    const std::string           mName;
-    ProcessingRate              mRate;
+    const ProcessingRateKind mKind;
+    const uint16_t mRatioNumerator;
+    const uint16_t mRatioDenominator;
+    std::string mReferenceStreamSet;
+}; 
+
+ProcessingRate FixedRatio(unsigned strmItems, unsigned referenceItems = 1, std::string && referenceStreamSet = "");
+ProcessingRate MaxRatio(unsigned strmItems, unsigned referenceItems = 1, std::string && referenceStreamSet = "");
+ProcessingRate RoundUpToMultiple(unsigned itemMultiple, std::string &&referenceStreamSet = "");
+ProcessingRate Add1(std::string && referenceStreamSet = "");
+ProcessingRate UnknownRate();
+
+struct Binding {
+    Binding(llvm::Type * type, const std::string & name, ProcessingRate r = FixedRatio(1))
+    : type(type), name(name), rate(r) { }
+    llvm::Type * const        type;
+    const std::string         name;
+    ProcessingRate      rate;
 };
 
-using Bindings = std::vector<Binding>;
-
-class KernelInterface : public AttributeSet {
+class KernelInterface {
 public:
     /*
      
@@ -116,6 +92,8 @@ public:
         return mKernelName;
     }
        
+    void setName(std::string newName) { mKernelName = newName; }
+
     virtual bool isCachable() const = 0;
 
     virtual std::string makeSignature(const std::unique_ptr<kernel::KernelBuilder> & idb) = 0;
@@ -125,24 +103,14 @@ public:
     }
 
     const Binding & getStreamInput(const unsigned i) const {
-        assert (i < getNumOfStreamInputs());
         return mStreamSetInputs[i];
-    }
-
-    unsigned getNumOfStreamInputs() const {
-        return mStreamSetInputs.size();
     }
 
     const std::vector<Binding> & getStreamOutputs() const {
         return mStreamSetOutputs;
     }
 
-    unsigned getNumOfStreamOutputs() const {
-        return mStreamSetOutputs.size();
-    }
-
     const Binding & getStreamOutput(const unsigned i) const {
-        assert (i < getNumOfStreamOutputs());
         return mStreamSetOutputs[i];
     }
 
@@ -181,10 +149,18 @@ public:
         return mKernelInstance;
     }
 
-    void setInstance(llvm::Value * const instance);
+    void setInstance(llvm::Value * const instance) {
+        assert ("kernel instance cannot be null!" && instance);
+        assert ("kernel instance must point to a valid kernel state type!" && (instance->getType()->getPointerElementType() == mKernelStateType));
+        mKernelInstance = instance;
+    }
 
-    bool hasPrincipalItemCount() const {
-        return mHasPrincipalItemCount;
+    unsigned getLookAhead() const {
+        return mLookAheadPositions;
+    }
+
+    void setLookAhead(const unsigned lookAheadPositions) {
+        mLookAheadPositions = lookAheadPositions;
     }
 
 protected:
@@ -195,18 +171,16 @@ protected:
 
     llvm::Function * getTerminateFunction(llvm::Module * const module) const;
 
-    llvm::CallInst * makeDoSegmentCall(KernelBuilder & idb, const std::vector<llvm::Value *> & args) const;
-
-    KernelInterface(const std::string && kernelName,
-                    Bindings && stream_inputs,
-                    Bindings && stream_outputs,
-                    Bindings && scalar_inputs,
-                    Bindings && scalar_outputs,
-                    Bindings && internal_scalars)
+    KernelInterface(std::string kernelName,
+                    std::vector<Binding> && stream_inputs,
+                    std::vector<Binding> && stream_outputs,
+                    std::vector<Binding> && scalar_inputs,
+                    std::vector<Binding> && scalar_outputs,
+                    std::vector<Binding> && internal_scalars)
     : mKernelInstance(nullptr)
     , mModule(nullptr)
     , mKernelStateType(nullptr)
-    , mHasPrincipalItemCount(false)
+    , mLookAheadPositions(0)
     , mKernelName(kernelName)
     , mStreamSetInputs(stream_inputs)
     , mStreamSetOutputs(stream_outputs)
@@ -218,19 +192,17 @@ protected:
     
 protected:
 
-    llvm::Value *                   mKernelInstance;
-    llvm::Module *                  mModule;
-    llvm::StructType *              mKernelStateType;
-    bool                            mHasPrincipalItemCount;
-    const std::string               mKernelName;
-    std::vector<llvm::Value *>      mInitialArguments;
-    Bindings                        mStreamSetInputs;
-    Bindings                        mStreamSetOutputs;
-    Bindings                        mScalarInputs;
-    Bindings                        mScalarOutputs;
-    Bindings                        mInternalScalars;
+    llvm::Value *                           mKernelInstance;
+    llvm::Module *                          mModule;
+    llvm::StructType *                      mKernelStateType;
+    unsigned                                mLookAheadPositions;
+    std::string                             mKernelName;
+    std::vector<llvm::Value *>              mInitialArguments;
+    std::vector<Binding>                    mStreamSetInputs;
+    std::vector<Binding>                    mStreamSetOutputs;
+    std::vector<Binding>                    mScalarInputs;
+    std::vector<Binding>                    mScalarOutputs;
+    std::vector<Binding>                    mInternalScalars;
 };
-
-}
 
 #endif 

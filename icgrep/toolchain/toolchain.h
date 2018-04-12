@@ -12,17 +12,6 @@
 #include <llvm/Target/TargetOptions.h>
 #include <llvm/Target/TargetMachine.h>
 
-// #defines for comparison with LLVM_VERSION_INTEGER
-#define LLVM_VERSION_CODE(major, minor, point) ((10000 * major) + (100 * minor) + point)
-
-// From LLVM 4.0.0 the clEnumValEnd sentinel is no longer needed.
-// We define a macro to adapt to the CommandLine syntax based on LLVM version.
-#if LLVM_VERSION_INTEGER < LLVM_VERSION_CODE(4, 0, 0)
-#define CL_ENUM_VAL_SENTINEL , clEnumValEnd
-#else
-#define CL_ENUM_VAL_SENTINEL
-#endif
-
 // FIXME: llvm/CodeGen/CommandFlags.h can only be included once or the various cl::opt causes multiple definition
 // errors. To bypass for now, the relevant options and functions are accessible from here. Re-evaluate with later
 // versions of LLVM.
@@ -31,41 +20,38 @@ namespace llvm { namespace cl { class OptionCategory; } }
 
 namespace codegen {
 
-const llvm::cl::OptionCategory * LLVM_READONLY codegen_flags();
+const llvm::cl::OptionCategory * codegen_flags();
 
 // Command Parameters
 enum DebugFlags {
+    ShowUnoptimizedIR,
+    ShowIR,
     VerifyIR,
-    SerializeThreads,
-    TraceCounts,
-    TraceDynamicBuffers,
-    EnableAsserts,
-    EnableCycleCounter,
-    DisableIndirectBranch,
-    DebugFlagSentinel
+#ifndef USE_LLVM_3_6
+    ShowASM,
+#endif
+    SerializeThreads
 };
 
-bool LLVM_READONLY DebugOptionIsSet(const DebugFlags flag);
+bool DebugOptionIsSet(const DebugFlags flag);
 
+extern bool PipelineParallel;
 extern bool SegmentPipelineParallel;
-    
-// Options for generating IR or ASM to files
-const std::string OmittedOption = ".";
-extern std::string ShowUnoptimizedIROption;
-extern std::string ShowIROption;
-#if LLVM_VERSION_INTEGER >= LLVM_VERSION_CODE(3, 7, 0)
-extern std::string ShowASMOption;
+#ifndef USE_LLVM_3_6
+extern const char * ASMOutputFilename;
 #endif
+extern const char * IROutputFilename;
 extern const char * ObjectCacheDir;
-extern unsigned CacheDaysLimit;  // set from command line
 extern llvm::CodeGenOpt::Level OptLevel;  // set from command line
-extern unsigned BlockSize;  // set from command line
-extern unsigned SegmentSize;  // set from command line
-extern unsigned BufferSegments;
-extern unsigned ThreadNum;
+extern int BlockSize;  // set from command line
+extern int SegmentSize;  // set from command line
+extern int BufferSegments;
+extern int ThreadNum;
 extern bool EnableObjectCache;
+extern bool EnableAsserts;
+extern bool EnableCycleCounter;
 extern bool NVPTX;
-extern unsigned GroupNum;
+extern int GroupNum;
 extern std::string ProgramName;
 extern llvm::TargetOptions Options;
 extern const llvm::Reloc::Model RelocModel;
@@ -85,5 +71,7 @@ void ParseCommandLineOptions(int argc, const char *const *argv, std::initializer
 }
 
 void AddParabixVersionPrinter();
+
+bool AVX2_available();
 
 #endif

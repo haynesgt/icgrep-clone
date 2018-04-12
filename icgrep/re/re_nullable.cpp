@@ -7,7 +7,6 @@
 #include <re/re_name.h>            // for Name
 #include <re/re_rep.h>             // for Rep, makeRep
 #include <re/re_seq.h>             // for Seq, makeSeq
-#include <re/re_group.h>             // for Seq, makeSeq
 #include <vector>                  // for vector, allocator
 #include <llvm/Support/Casting.h>  // for dyn_cast, isa
 
@@ -23,56 +22,7 @@ using namespace llvm;
 
 namespace re {
 
-    
-RE * RE_Nullable::excludeNullable(RE * re) {
-    if (!isNullable(re)) return re;
-    if (Seq * seq = dyn_cast<Seq>(re)) {
-        // All items in the seq must be nullable.  We must allow
-        // all possibilities that all but one continue to match empty.
-        std::vector<RE*> alts;
-        for (auto i = 0; i < seq->size(); i++) {
-            std::vector<RE*> list;
-            for (auto j = 0; j < seq->size(); j++) {
-                if (i == j) {
-                    list.push_back(excludeNullable(&seq[j]));
-                } else {
-                    list.push_back(&seq[j]);
-                }
-            }
-            alts.push_back(makeSeq(list.begin(), list.end()));
-        }
-        return makeAlt(alts.begin(), alts.end());
-    } else if (Alt * alt = dyn_cast<Alt>(re)) {
-        std::vector<RE*> list;
-        for (auto i = alt->begin(); i != alt->end(); ++i) {
-            list.push_back(excludeNullable(*i));
-        }
-        return makeAlt(list.begin(), list.end());
-    } else if (Rep * rep = dyn_cast<Rep>(re)) {
-        auto lb = rep->getLB();
-        auto ub = rep->getUB();
-        auto e = rep->getRE();
-        if (!isNullable(e)) {
-            assert (lb == 0);  // because isNullable(re) is true
-            return makeRep(e, 1, ub);
-        }
-        auto e1 = excludeNullable(e);
-        if (ub == 1) {
-            return e1;
-        } else {
-            return makeSeq({e1, makeRep(e, lb == 0 ? 0 : lb - 1, ub == Rep::UNBOUNDED_REP ? ub : ub - 1)});
-        }
-    } else if (Group * g = dyn_cast<Group>(re)) {
-        return makeGroup(g->getMode(), excludeNullable(g->getRE()), g->getSense());
-    } else if (Name * name = dyn_cast<Name>(re)) {
-        return excludeNullable(name->getDefinition());
-    }
-    return re;
-}
-
-    
 RE * RE_Nullable::removeNullablePrefix(RE * re) {
-    if (!hasNullablePrefix(re)) return re;
     if (Seq * seq = dyn_cast<Seq>(re)) {
         std::vector<RE*> list;
         for (auto i = seq->begin(); i != seq->end(); ++i) {
@@ -82,29 +32,26 @@ RE * RE_Nullable::removeNullablePrefix(RE * re) {
                 break;
             }
         }
-        return makeSeq(list.begin(), list.end());
+        re = makeSeq(list.begin(), list.end());
     } else if (Alt * alt = dyn_cast<Alt>(re)) {
         std::vector<RE*> list;
         for (auto i = alt->begin(); i != alt->end(); ++i) {
             list.push_back(removeNullablePrefix(*i));
         }
-        return makeAlt(list.begin(), list.end());
+        re = makeAlt(list.begin(), list.end());
     } else if (Rep * rep = dyn_cast<Rep>(re)) {
-        auto lb = rep->getLB();
-        auto e = rep->getRE();
-        if ((lb == 0) || isNullable(e)) {
-            return makeSeq();
+        if ((rep->getLB() == 0) || (isNullable(rep->getRE()))) {
+            re = makeSeq();
         }
-        else if (hasNullablePrefix(e)) {
-            return makeSeq({removeNullablePrefix(e), makeRep(e, lb - 1, lb - 1)});
+        else if (hasNullablePrefix(rep->getRE())) {
+            re = makeSeq({removeNullablePrefix(rep->getRE()), makeRep(rep->getRE(), rep->getLB() - 1, rep->getLB() - 1)});
         }
         else {
-            return makeRep(e, lb, lb);
+            re = makeRep(rep->getRE(), rep->getLB(), rep->getLB());
         }
     } else if (Name * name = dyn_cast<Name>(re)) {
-        auto def = name->getDefinition();
-        if (hasNullablePrefix(def)) {
-            return removeNullablePrefix(def);
+        if (name->getDefinition()) {
+            name->setDefinition(removeNullablePrefix(name->getDefinition()));
         }
     }
     return re;
@@ -120,31 +67,107 @@ RE * RE_Nullable::removeNullableSuffix(RE * re) {
                 break;
             }
         }
-        return makeSeq(list.begin(), list.end());
+        re = makeSeq(list.begin(), list.end());
     } else if (Alt* alt = dyn_cast<Alt>(re)) {
         std::vector<RE*> list;
         for (auto i = alt->begin(); i != alt->end(); ++i) {
             list.push_back(removeNullableSuffix(*i));
         }
-        return makeAlt(list.begin(), list.end());
+        re = makeAlt(list.begin(), list.end());
     } else if (Rep * rep = dyn_cast<Rep>(re)) {
-        auto lb = rep->getLB();
-        auto e = rep->getRE();
-        if ((lb == 0) || isNullable(e)) {
-            return makeSeq();
+        if ((rep->getLB() == 0) || (isNullable(rep->getRE()))) {
+            re = makeSeq();
         }
-        else if (hasNullableSuffix(e)) {
-            return makeSeq({makeRep(e, lb - 1, lb - 1), removeNullableSuffix(e)});
+        else if (hasNullableSuffix(rep->getRE())) {
+            re = makeSeq({makeRep(rep->getRE(), rep->getLB() - 1, rep->getLB() - 1), removeNullableSuffix(rep->getRE())});
         }
         else {
-            return makeRep(e, lb, lb);
+            re = makeRep(rep->getRE(), rep->getLB(), rep->getLB());
         }
     } else if (Name * name = dyn_cast<Name>(re)) {
-        auto def = name->getDefinition();
-        if (hasNullableSuffix(def)) {
-            return removeNullableSuffix(def);
+        if (name->getDefinition()) {
+            name->setDefinition(removeNullableSuffix(name->getDefinition()));
         }
     }
+    return re;
+}
+
+// Deal with case: R1 (Assertion R2) R3
+// If R2 is nullable, then R1 R3. 
+RE * RE_Nullable::removeNullableAssertion(RE * re) {
+    if (Assertion * a = dyn_cast<Assertion>(re)) {
+        if (isNullable(a->getAsserted())) {
+	    std::vector<RE *> seq;
+	    return makeSeq(seq.begin(), seq.end());
+        } else {
+            return re;
+        }
+    } else if (Seq * seq = dyn_cast<Seq>(re)) {
+        std::vector<RE*> list;
+        for (auto i = seq->begin(); i != seq->end(); ++i) {
+            list.push_back(removeNullableAssertion(*i));
+        }
+        re = makeSeq(list.begin(), list.end());
+    } else if (Alt * alt = dyn_cast<Alt>(re)) {
+        std::vector<RE*> list;
+        for (auto i = alt->begin(); i != alt->end(); ++i) {
+            list.push_back(removeNullableAssertion(*i));
+        }
+        re = makeAlt(list.begin(), list.end());
+    } 
+    return re;
+}
+
+// Deal with case: R1 (Assertion R2) R3 
+// If R3 is nullable, then R1 R2.
+RE * RE_Nullable::removeNullableAfterAssertion(RE * re) {
+    if (isNullableAfterAssertion(re)) {
+	re = removeNullableAfterAssertion_helper(re);
+    }
+    return re;
+}
+
+bool RE_Nullable::isNullableAfterAssertion(const RE * re) {
+    bool nullable = false;
+    if (const Seq * seq = dyn_cast<const Seq>(re)) {
+        if (isNullable(re)) {
+            return nullable;
+        } else {
+            nullable = isa<Assertion>(seq->back()) ? true : isNullableAfterAssertion(seq->back());
+        }
+    } else if (const Alt * alt = dyn_cast<const Alt>(re)) {
+        for (const RE * re : *alt) {
+            if (isNullableAfterAssertion(re)) {
+                nullable = true;
+                break;
+            }
+        }
+    }   
+    return nullable;
+}
+
+RE * RE_Nullable::removeNullableAfterAssertion_helper(RE * re) {
+    if (Assertion * a = dyn_cast<Assertion>(re)) {
+        if (a->getSense() == Assertion::Sense::Positive) {
+            return a->getAsserted();
+        } else {
+            return makeDiff(makeAny(), a->getAsserted());
+        }
+    } else if (Seq * seq = dyn_cast<Seq>(re)) {
+        std::vector<RE*> list;
+        auto i = seq->begin();
+        for (; i != seq->end() - 1; ++i) {
+            list.push_back(*i);
+        }
+        list.push_back(removeNullableAfterAssertion_helper(*i));
+        re = makeSeq(list.begin(), list.end());
+    } else if (Alt * alt = dyn_cast<Alt>(re)) {
+        std::vector<RE*> list;
+        for (auto i = alt->begin(); i != alt->end(); ++i) {
+            list.push_back(removeNullableAfterAssertion_helper(*i));
+        }
+        re = makeAlt(list.begin(), list.end());
+    } 
     return re;
 }
 
@@ -163,54 +186,53 @@ bool RE_Nullable::isNullable(const RE * re) {
             }
         }
     } else if (const Rep* re_rep = dyn_cast<const Rep>(re)) {
-        return (re_rep->getLB() == 0) || isNullable(re_rep->getRE());
-    } else if (isa<Diff>(re)) {
-        // a Diff of Seq({}) and an Assertion represents a complemented assertion.
-        return false;
+        return re_rep->getLB() == 0 ? true : isNullable(re_rep->getRE());
+    } else if (const Diff * diff = dyn_cast<const Diff>(re)) {
+        return isNullable(diff->getLH()) && !isNullable(diff->getRH());
     } else if (const Intersect * e = dyn_cast<const Intersect>(re)) {
         return isNullable(e->getLH()) && isNullable(e->getRH());
-    } else if (const Group * g = dyn_cast<const Group>(re)) {
-        return isNullable(g->getRE());
-    }
+    } 
     return false;
 }
 
 bool RE_Nullable::hasNullablePrefix(const RE * re) {
+    bool nullable = false;
     if (const Seq * seq = dyn_cast<const Seq>(re)) {
-        if (seq->empty()) return false;
-        return isNullable(seq->front()) || hasNullablePrefix(seq->front());
+        nullable = isNullable(seq->front()) ? true : hasNullablePrefix(seq->front());
     } else if (const Alt * alt = dyn_cast<const Alt>(re)) {
-        for (const RE * a : *alt) {
-            if (hasNullablePrefix(a)) {
-                return true;
+        for (const RE * re : *alt) {
+            if (hasNullablePrefix(re)) {
+                nullable = true;
+                break;
             }
         }
-        return false;
     } else if (const Rep * rep = dyn_cast<const Rep>(re)) {
-        return (rep->getLB() != rep->getUB()) || hasNullablePrefix(rep->getRE());
-    } else if (const Group * g = dyn_cast<const Group>(re)) {
-        return hasNullablePrefix(g->getRE());
+        nullable = true;
+        if (rep->getLB() == rep->getUB()) {
+            nullable = hasNullablePrefix(rep->getRE());
+        }
     }
-    return false;
+    return nullable;
 }
 
 bool RE_Nullable::hasNullableSuffix(const RE * re) {
+    bool nullable = false;
     if (const Seq * seq = dyn_cast<const Seq>(re)) {
-        if (seq->empty()) return false;
-        return isNullable(seq->back()) || hasNullableSuffix(seq->back());
+        nullable = isNullable(seq->back()) ? true : hasNullableSuffix(seq->back());
     } else if (const Alt * alt = dyn_cast<const Alt>(re)) {
-        for (const RE * a : *alt) {
-            if (hasNullableSuffix(a)) {
-                return true;
+        for (const RE * re : *alt) {
+            if (hasNullableSuffix(re)) {
+                nullable = true;
+                break;
             }
         }
-        return false;
     } else if (const Rep * rep = dyn_cast<const Rep>(re)) {
-        return (rep->getLB() != rep->getUB()) || hasNullableSuffix(rep->getRE());
-    } else if (const Group * g = dyn_cast<const Group>(re)) {
-        return hasNullableSuffix(g->getRE());
+        nullable = true;
+        if (rep->getLB() == rep->getUB()) {
+            nullable = hasNullableSuffix(rep->getRE());
+        }
     }
-    return false;
+    return nullable;
 }
 
 }

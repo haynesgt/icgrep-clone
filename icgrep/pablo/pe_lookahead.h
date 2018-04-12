@@ -23,16 +23,16 @@ public:
     }
     virtual ~Lookahead() {
     }
-    inline PabloAST * getExpression() const {
+    inline PabloAST * getExpr() const {
         return getOperand(0);
     }
-    inline unsigned getAmount() const {
+    inline int64_t getAmount() const {
         return llvm::cast<Integer>(getOperand(1))->value();
     }
 protected:
     Lookahead(PabloAST * expr, PabloAST * shiftAmount, const String * name, Allocator & allocator)
     : Statement(ClassTypeId::Lookahead, expr->getType(), {expr, shiftAmount}, name, allocator) {
-        assert(llvm::isa<Integer>(shiftAmount) && llvm::cast<Integer>(shiftAmount)->value() >= 0);
+        assert(llvm::isa<Integer>(shiftAmount));
     }
 };
 

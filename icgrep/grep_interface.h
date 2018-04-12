@@ -12,14 +12,14 @@
  
 #include <string>       // for string
 #include <vector>
-#include <re/parsers/parser.h>  // for re::RE_Syntax
+#include <re/re_parser.h>  // for re::RE_Syntax
 
 namespace re { class CC; }
 namespace re { class RE; }
 namespace llvm { namespace cl { class OptionCategory; } }
 
 
-namespace argv {
+namespace grep {
     
 
 void InitializeCommandLineInterface(int argc, char *argv[]);
@@ -40,15 +40,20 @@ extern std::vector<std::string> RegexpVector; // -e
 extern std::string FileFlag; // -f
 
 /*
- *  B.  Grep input options.
+ *  B.  Grep input sources and interpretation.
  */
 
 // Use DirectoriesFlag==Recurse to test for recursive mode.
+//extern bool RecursiveFlag; 
+extern bool DereferenceRecursiveFlag; // -R
 extern bool TextFlag; // -a
 extern bool BinaryFlag; // -U
 extern bool NullDataFlag; // -z
-extern bool UnicodeLinesFlag; // -Unicode-lines
-
+extern bool MmapFlag; // -mmap
+extern std::string ExcludeFlag; // -exclude
+extern std::string ExcludeFromFlag; // -exclude-from
+extern std::string ExcludeDirFlag; // -exclude-dir
+extern std::string IncludeFlag; // -include
 
 /*
  *  C.  Grep output modes and options.
@@ -64,10 +69,14 @@ extern GrepModeType Mode;
 enum ColoringType {alwaysColor, autoColor, neverColor};
 extern ColoringType ColorFlag;
 
+enum DevDirAction {Read, Skip, Recurse};
+extern DevDirAction DevicesFlag;
+extern DevDirAction DirectoriesFlag;
+    
 enum BinaryFilesMode {Binary, WithoutMatch, Text};
 extern BinaryFilesMode BinaryFilesFlag;
     
-extern bool NoMessagesFlag; // -s  (also set by QuietMode/-q)
+extern bool NoMessagesFlag; // -s
 extern bool WithFilenameFlag; // -H
 extern bool NoFilenameFlag; // -h
 extern bool NullFlag; // -Z
@@ -78,10 +87,11 @@ extern bool InitialTabFlag; // -T
 extern bool OnlyMatchingFlag; // -o
 extern std::string LabelFlag; // -label
 extern bool LineBufferedFlag; // -line-buffered
+extern bool NormalizeLineBreaksFlag; // -normalize-line-breaks
 extern int AfterContextFlag; // -A
 extern int BeforeContextFlag; // -B
 extern int ContextFlag; // -C
-extern int MaxCountFlag; // -m  (overridden and set to 1 with -q, -l, -L modes)
+extern int MaxCountFlag; // -m
     
 
 //

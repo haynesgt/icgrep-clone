@@ -10,19 +10,6 @@
 namespace kernel { class KernelBuilder; }
 
 namespace kernel {
-#define USE_DIRECT_LF_BUILDER
-
-class LineFeedKernelBuilder final : public pablo::PabloKernel {
-public:
-    LineFeedKernelBuilder(const std::unique_ptr<KernelBuilder> & b, kernel::Binding && inputStreamSet);
-    bool isCachable() const override { return true; }
-    bool hasSignature() const override { return false; }
-protected:
-    void generatePabloMethod() override;
-    unsigned mNumOfStreams;
-    unsigned mStreamFieldWidth;
-};
-
 
 class LineBreakKernelBuilder final : public pablo::PabloKernel {
 public:

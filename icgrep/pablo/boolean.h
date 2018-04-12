@@ -5,7 +5,7 @@
 
 namespace pablo {
 
-class And final : public Statement {
+class And final : public Variadic {
     friend class PabloBlock;
 public:
     static inline bool classof(const PabloAST * e) {
@@ -17,13 +17,23 @@ public:
     virtual ~And() { }
 protected:
     And(llvm::Type * const type, PabloAST * expr1, PabloAST * expr2, const String * name, Allocator & allocator)
-    : Statement(ClassTypeId::And, type, {expr1, expr2}, name, allocator)
+    : Variadic(ClassTypeId::And, type, {expr1, expr2}, name, allocator)
     {
+
+    }
+    And(llvm::Type * const type, const unsigned reserved, const String * name, Allocator & allocator)
+    : Variadic(ClassTypeId::And, type, reserved, name, allocator)
+    {
+
+    }
+    template<typename iterator>
+    And(llvm::Type * const type, iterator begin, iterator end, const String * name, Allocator & allocator)
+    : Variadic(ClassTypeId::And, type, begin, end, name, allocator) {
 
     }
 };
 
-class Or final : public Statement {
+class Or final : public Variadic {
     friend class PabloBlock;
 public:
     static inline bool classof(const PabloAST * e) {
@@ -35,13 +45,23 @@ public:
     virtual ~Or() { }
 protected:
     Or(llvm::Type * const type, PabloAST * expr1, PabloAST * expr2, const String * name, Allocator & allocator)
-    : Statement(ClassTypeId::Or, type, {expr1, expr2}, name, allocator)
+    : Variadic(ClassTypeId::Or, type, {expr1, expr2}, name, allocator)
     {
+
+    }
+    Or(llvm::Type * const type, const unsigned reserved, const String * name, Allocator & allocator)
+    : Variadic(ClassTypeId::Or, type, reserved, name, allocator)
+    {
+
+    }
+    template<typename iterator>
+    Or(llvm::Type * const type, iterator begin, iterator end, const String * name, Allocator & allocator)
+    : Variadic(ClassTypeId::Or, type, begin, end, name, allocator) {
 
     }
 };
 
-class Xor final : public Statement {
+class Xor final : public Variadic {
     friend class PabloBlock;
 public:
     static inline bool classof(const PabloAST * e) {
@@ -52,8 +72,18 @@ public:
     }
 protected:
     Xor(llvm::Type * const type, PabloAST * expr1, PabloAST * expr2, const String * name, Allocator & allocator)
-    : Statement(ClassTypeId::Xor, type, {expr1, expr2}, name, allocator)
+    : Variadic(ClassTypeId::Xor, type, {expr1, expr2}, name, allocator)
     {
+
+    }
+    Xor(llvm::Type * const type, const unsigned reserved, const String * name, Allocator & allocator)
+    : Variadic(ClassTypeId::Xor, type, reserved, name, allocator)
+    {
+
+    }
+    template<typename iterator>
+    Xor(llvm::Type * const type, iterator begin, iterator end, const String * name, Allocator & allocator)
+    : Variadic(ClassTypeId::Xor, type, begin, end, name, allocator) {
 
     }
 };

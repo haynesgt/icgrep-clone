@@ -16,12 +16,9 @@
 #include <re/re_rep.h>
 #include <re/re_seq.h>
 #include <re/re_start.h>
-#include <re/re_range.h>
 #include <re/re_diff.h>
 #include <re/re_intersect.h>
 #include <re/re_assertion.h>
-#include <re/re_group.h>
-#include <cc/alphabet.h>
 
 using namespace re;
 using namespace llvm;
@@ -44,34 +41,22 @@ const std::string Printer_RE::PrintRE(const RE * re) {
         retVal += "])";
     } else if (const CC* re_cc = dyn_cast<const CC>(re)) {
         retVal = "CC \"";
-        retVal += re_cc->canonicalName();
+        retVal += re_cc->canonicalName(UnicodeClass);
         retVal += "\" ";
 
         for (const auto & i : *re_cc) {
             retVal += "[";
-            retVal += std::to_string(lo_codepoint(i));
-            if (hi_codepoint(i) != lo_codepoint(i))
-                retVal += "-" + std::to_string(hi_codepoint(i));
+            retVal += std::to_string(lo_codepoint(i)) + ",";
+            retVal += std::to_string(hi_codepoint(i));
             retVal += "]";
         }
-        retVal += "/" + re_cc->getAlphabet()->getName();
     } else if (const Name* re_name = dyn_cast<const Name>(re)) {
         retVal = "Name \"";
-        if (re_name->hasNamespace()) {
-            retVal += re_name->getNamespace();
-            retVal += ":";
-        }
         retVal += re_name->getName();
         retVal += "\" ";
-        //if (re_name->getType() == Name::Type::Capture) {
+        if (re_name->getType() == Name::Type::Capture) {
             retVal += "=(" + PrintRE(re_name->getDefinition()) + ")";
-        //}
-    } else if (const Range* rg = dyn_cast<const Range>(re)) {
-        retVal = "Range (";
-        retVal += PrintRE(rg->getLo());
-        retVal += " , ";
-        retVal += PrintRE(rg->getHi());
-        retVal += ") ";
+        }
     } else if (const Assertion * a = dyn_cast<const Assertion>(re)) {
         retVal = (a->getSense() == Assertion::Sense::Positive) ? "" : "Negative";
         switch (a->getKind()) {
@@ -126,16 +111,6 @@ const std::string Printer_RE::PrintRE(const RE * re) {
             comma = true;
         }
         retVal.append("])");
-    } else if (const Group * g = dyn_cast<const Group>(re)) {
-        retVal = "Group(";
-        if (g->getMode() == Group::Mode::GraphemeMode) {
-            retVal.append((g->getSense() == Group::Sense::On) ? "+g:" : "-g:");
-        }
-        else if (g->getMode() == Group::Mode::CaseInsensitiveMode) {
-            retVal.append((g->getSense() == Group::Sense::On) ? "+i:" : "-i:");
-        }
-        retVal.append(PrintRE(g->getRE()));
-        retVal.append(")");
     } else if (isa<const Start>(re)) {
         retVal = "Start";
     } else if (isa<const Any>(re)) {

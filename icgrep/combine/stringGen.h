@@ -3,8 +3,7 @@
 
 #include <string>
 #include <vector>
-#include <re/re_cc.h>
-#include <re/parsers/parser.h>
+#include <re/re_parser.h>
 
 namespace re {
     class RE;
@@ -14,28 +13,14 @@ class StringGenerator
 {
 
 public:
-    StringGenerator(std::string re, std::vector<std::string> flags, re::RE_Syntax syntax);
-
-    std::vector<re::CC* > generate(re::RE *re, bool Complement=false, bool getOne=false);
-    std::string generate();
-    std::string stringifyVec(std::vector<re::CC *> elements);
-
-    ~StringGenerator();
+    std::vector<std::string> generate( re::RE *re);
+    std::string generate(std::string re, std::vector<std::string> flags, re::RE_Syntax syntax);
+    static std::string stringifyVec(std::vector<std::string> elements, std::string separator="");
+    
 
 private:
-
-	std::string mRegex;
-	std::vector<std::string> mFlags;
-	re::RE_Syntax mSyntax;
-	std::vector<std::vector<re::CC *>> mReferences;
-
-    re::CC * const asciiCC;
-    re::CC * const unicodeCC;
-    re::CC * const forbiddenCC;
-    re::CC * const allCodepointsCC;
-
-    re::CC * getRandomCodepointCC(re::CC * cc);
-    re::CC * getAllCodepoints();
+	static std::vector<std::string> references;
+	static bool hasFlag(std::string flag, std::vector<std::string> flags);
 
 };
 

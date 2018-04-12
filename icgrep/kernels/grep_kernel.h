@@ -9,28 +9,17 @@
 
 namespace IDISA { class IDISA_Builder; }
 namespace re { class RE; }
-namespace cc { class Alphabet; }
 namespace kernel {
 
+struct RegularExpressionOptimizer {
+    RegularExpressionOptimizer(re::RE * re_ast);
+protected:
+    re::RE * const  mRE;
+    std::string     mSignature;
+};
+
+
     
-class UnicodeNonFinalKernel : public pablo::PabloKernel {
-public:
-    UnicodeNonFinalKernel(const std::unique_ptr<kernel::KernelBuilder> & kb);
-    bool isCachable() const override { return true; }
-    bool hasSignature() const override { return false; }
-protected:
-    void generatePabloMethod() override;
-};
-
-class UnicodeLineBreakKernel : public pablo::PabloKernel {
-public:
-    UnicodeLineBreakKernel(const std::unique_ptr<kernel::KernelBuilder> & kb);
-    bool isCachable() const override { return true; }
-    bool hasSignature() const override { return false; }
-protected:
-    void generatePabloMethod() override;
-};
-
 class RequiredStreams_UTF8 : public pablo::PabloKernel {
 public:
     RequiredStreams_UTF8(const std::unique_ptr<kernel::KernelBuilder> & kb);
@@ -50,60 +39,13 @@ protected:
 };
 
 
-struct ICGrepSignature {
-    ICGrepSignature(re::RE * re_ast);
-protected:
-    re::RE * const  mRE;
-    std::string     mSignature;
-};
-
-    
-class ICGrepKernel : public ICGrepSignature, public pablo::PabloKernel {
+class ICGrepKernel : public RegularExpressionOptimizer, public pablo::PabloKernel {
 public:
-    ICGrepKernel(const std::unique_ptr<kernel::KernelBuilder> & iBuilder, re::RE * const re_ast, std::vector<std::string> externals, std::vector<cc::Alphabet *> alphabets = {});
+    ICGrepKernel(const std::unique_ptr<kernel::KernelBuilder> & iBuilder, re::RE * const re_ast, bool cc = false, unsigned cc_size = 0);
     std::string makeSignature(const std::unique_ptr<kernel::KernelBuilder> & iBuilder) override;
     bool isCachable() const override { return true; }
 protected:
     void generatePabloMethod() override;
-    std::vector<std::string> mExternals;
-    std::vector<cc::Alphabet *> mAlphabets;
-};
-
-struct ByteGrepSignature {
-    ByteGrepSignature(re::RE * re);
-protected:
-    re::RE * const  mRE;
-    std::string     mSignature;
-};
-
-
-class ByteGrepKernel : public ByteGrepSignature, public pablo::PabloKernel {
-public:
-    ByteGrepKernel(const std::unique_ptr<kernel::KernelBuilder> & iBuilder, re::RE * const re, std::vector<std::string> externals = {});
-    std::string makeSignature(const std::unique_ptr<kernel::KernelBuilder> & iBuilder) override;
-    bool isCachable() const override { return true; }
-protected:
-    void generatePabloMethod() override;
-    std::vector<std::string> mExternals;
-};
-    
-struct ByteBitGrepSignature {
-    ByteBitGrepSignature(re::RE * prefix, re::RE * suffix);
-protected:
-    re::RE * const  mPrefixRE;
-    re::RE * const  mSuffixRE;
-    std::string     mSignature;
-};
-
-    
-class ByteBitGrepKernel : public ByteBitGrepSignature, public pablo::PabloKernel {
-public:
-    ByteBitGrepKernel(const std::unique_ptr<kernel::KernelBuilder> & iBuilder, re::RE * const prefix, re::RE * const suffix, std::vector<std::string> externals = {});
-    std::string makeSignature(const std::unique_ptr<kernel::KernelBuilder> & iBuilder) override;
-    bool isCachable() const override { return true; }
-protected:
-    void generatePabloMethod() override;
-    std::vector<std::string> mExternals;
 };
 
 class MatchedLinesKernel : public pablo::PabloKernel {

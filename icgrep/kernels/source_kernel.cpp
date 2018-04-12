@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2018 International Characters.
+ *  Copyright (c) 2017 International Characters.
  *  This software is licensed to the public under the Open Software License 3.0.
  */
 #include "source_kernel.h"
@@ -8,11 +8,14 @@
 #include <llvm/IR/Module.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <toolchain/toolchain.h>
 
 using namespace llvm;
 
-extern "C" uint64_t file_size(const uint32_t fd) {
+inline static size_t round_up_to_nearest(const size_t x, const size_t y) {
+    return (((x - 1) | (y - 1)) + 1);
+}
+
+uint64_t file_size(const uint32_t fd) {
     struct stat st;
     if (LLVM_UNLIKELY(fstat(fd, &st) != 0)) {
         st.st_size = 0;
@@ -24,332 +27,361 @@ namespace kernel {
 
 /// MMAP SOURCE KERNEL
 
-Function * MMapSourceKernel::linkFileSizeMethod(const std::unique_ptr<kernel::KernelBuilder> & kb) {
-    return kb->LinkFunction("file_size", &file_size);
+void MMapSourceKernel::linkExternalMethods(const std::unique_ptr<kernel::KernelBuilder> & kb) {
+    mFileSizeFunction = kb->LinkFunction("file_size", &file_size);
 }
 
-void MMapSourceKernel::generateInitializeMethod(Function * const fileSizeMethod, const unsigned codeUnitWidth, const std::unique_ptr<KernelBuilder> & kb) {
-
-    BasicBlock * const emptyFile = kb->CreateBasicBlock("emptyFile");
+void MMapSourceKernel::generateInitializeMethod(const std::unique_ptr<KernelBuilder> & kb) {
+    BasicBlock * const emptyFile = kb->CreateBasicBlock("EmptyFile");
     BasicBlock * const nonEmptyFile = kb->CreateBasicBlock("NonEmptyFile");
     BasicBlock * const exit = kb->CreateBasicBlock("Exit");
     IntegerType * const sizeTy = kb->getSizeTy();
+    assert (kb->getKernel() == this);
     Value * const fd = kb->getScalarField("fileDescriptor");
-    assert (fileSizeMethod);
-    Value * fileSize = kb->CreateZExtOrTrunc(kb->CreateCall(fileSizeMethod, fd), sizeTy);
-    kb->CreateLikelyCondBr(kb->CreateIsNotNull(fileSize), nonEmptyFile, emptyFile);
+    assert (mFileSizeFunction);
+    Value * fileSize = kb->CreateCall(mFileSizeFunction, fd);
+    fileSize = kb->CreateZExtOrTrunc(fileSize, sizeTy);
+    if (mCodeUnitWidth > 8) {
+        fileSize = kb->CreateUDiv(fileSize, kb->getSize(mCodeUnitWidth / 8));
+    }
+    Value * const isEmpty = kb->CreateICmpEQ(fileSize, ConstantInt::getNullValue(fileSize->getType()));
+    kb->CreateUnlikelyCondBr(isEmpty, emptyFile, nonEmptyFile);
+    // we cannot mmap a 0 length file; just create a 1-page sized fake file buffer for simplicity
+    kb->SetInsertPoint(emptyFile);
+    Constant * pageSize = kb->getSize(getpagesize());
+    Value * fakeFileBuffer = kb->CreateAnonymousMMap(pageSize);
+    kb->CreateBr(exit);
 
     kb->SetInsertPoint(nonEmptyFile);
-    PointerType * const codeUnitPtrTy = kb->getIntNTy(codeUnitWidth)->getPointerTo();
-    Value * const fileBuffer = kb->CreatePointerCast(kb->CreateFileSourceMMap(fd, fileSize), codeUnitPtrTy);
-    kb->setScalarField("buffer", fileBuffer);
-    kb->setBaseAddress("sourceBuffer", fileBuffer);
-    kb->CreateMAdvise(fileBuffer, fileSize, CBuilder::ADVICE_WILLNEED);
-    if (codeUnitWidth > 8) {
-        fileSize = kb->CreateUDiv(fileSize, kb->getSize(codeUnitWidth / 8));
-    }
-    kb->setBufferedSize("sourceBuffer", fileSize);
-    kb->setScalarField("fileSize", fileSize);
-    kb->setProducedItemCount("sourceBuffer", fileSize);
-    kb->setCapacity("sourceBuffer", fileSize);
-    kb->CreateBr(exit);
-
-    kb->SetInsertPoint(emptyFile);
-    kb->setTerminationSignal();
+    Value * fileBackedBuffer = kb->CreateFileSourceMMap(fd, fileSize);
     kb->CreateBr(exit);
 
     kb->SetInsertPoint(exit);
+    PHINode * buffer = kb->CreatePHI(fileBackedBuffer->getType(), 2);
+    buffer->addIncoming(fakeFileBuffer, emptyFile);
+    buffer->addIncoming(fileBackedBuffer, nonEmptyFile);
+    PHINode * size = kb->CreatePHI(sizeTy, 2);
+    size->addIncoming(pageSize, emptyFile);
+    size->addIncoming(fileSize, nonEmptyFile);
+    kb->setBaseAddress("sourceBuffer", buffer);
+    kb->setBufferedSize("sourceBuffer", size);
+    kb->setScalarField("readableBuffer", buffer);
+    kb->setScalarField("fileSize", fileSize);
+    kb->setCapacity("sourceBuffer", fileSize);
+    kb->CreateMAdvise(buffer, fileSize, CBuilder::ADVICE_WILLNEED);
+
 }
 
-void MMapSourceKernel::generateDoSegmentMethod(const unsigned codeUnitWidth, const std::unique_ptr<KernelBuilder> & kb) {
+void MMapSourceKernel::generateDoSegmentMethod(const std::unique_ptr<KernelBuilder> & kb) {
 
     BasicBlock * dropPages = kb->CreateBasicBlock("dropPages");
-    BasicBlock * checkRemaining = kb->CreateBasicBlock("checkRemaining");
+    BasicBlock * processSegment = kb->CreateBasicBlock("produceData");
     BasicBlock * setTermination = kb->CreateBasicBlock("setTermination");
-    BasicBlock * exit = kb->CreateBasicBlock("mmapSourceExit");
+    BasicBlock * mmapSourceExit = kb->CreateBasicBlock("mmapSourceExit");
 
-    Value * const fileSize = kb->getScalarField("fileSize");
-    Constant * const pageSize = kb->getSize(getpagesize());
-
+    // instruct the OS that it can safely drop any fully consumed pages
     Value * consumed = kb->getConsumedItemCount("sourceBuffer");
-    consumed = kb->CreateMul(consumed, kb->getSize(codeUnitWidth / 8));
-    consumed = kb->CreateAnd(consumed, ConstantExpr::getNeg(pageSize));
-    Value * const consumedBuffer = kb->getRawOutputPointer("sourceBuffer", consumed);
-    Value * const readableBuffer = kb->getScalarField("buffer");
-    Value * const unnecessaryBytes = kb->CreatePtrDiff(consumedBuffer, readableBuffer);
+    IntegerType * const consumedTy = cast<IntegerType>(consumed->getType());
+    Type * const voidPtrTy = kb->getVoidPtrTy();
+
+    DataLayout DL(kb->getModule());
+    IntegerType * const intAddrTy = kb->getIntPtrTy(DL);
+
+    // multiply the consumed count by the code unit size then mask off any partial pages
+    if (mCodeUnitWidth > 8) {
+        consumed = kb->CreateMul(consumed, ConstantInt::get(consumedTy, mCodeUnitWidth / 8));
+    }
+    const auto pageSize = getpagesize();
+    if (LLVM_LIKELY((pageSize & (pageSize - 1)) == 0)) {
+        consumed = kb->CreateAnd(consumed, ConstantExpr::getNeg(ConstantInt::get(consumedTy, pageSize)));
+    } else {
+        consumed = kb->CreateSub(consumed, kb->CreateURem(consumed, ConstantInt::get(consumedTy, pageSize)));
+    }
+
+    Value * sourceBuffer = kb->getBaseAddress("sourceBuffer");
+    sourceBuffer = kb->CreatePtrToInt(sourceBuffer, intAddrTy);
+    if (LLVM_UNLIKELY(intAddrTy->getBitWidth() > consumedTy->getBitWidth())) {
+        consumed = kb->CreateZExt(consumed, intAddrTy);
+    } else if (LLVM_UNLIKELY(intAddrTy->getBitWidth() < consumedTy->getBitWidth())) {
+        sourceBuffer = kb->CreateZExt(sourceBuffer, consumedTy);
+    }
+    Value * consumedBuffer = kb->CreateAdd(sourceBuffer, consumed);
+    Value * readableBuffer = kb->getScalarField("readableBuffer");
+    readableBuffer = kb->CreatePtrToInt(readableBuffer, consumedBuffer->getType());
+    Value * unnecessaryBytes = kb->CreateSub(consumedBuffer, readableBuffer);
 
     // avoid calling madvise unless an actual page table change could occur
-    kb->CreateLikelyCondBr(kb->CreateIsNotNull(unnecessaryBytes), dropPages, checkRemaining);
+    Value * hasPagesToDrop = kb->CreateICmpEQ(unnecessaryBytes, ConstantInt::getNullValue(intAddrTy));
+    kb->CreateLikelyCondBr(hasPagesToDrop, processSegment, dropPages);
 
     kb->SetInsertPoint(dropPages);
-    // instruct the OS that it can safely drop any fully consumed pages
-    kb->CreateMAdvise(readableBuffer, unnecessaryBytes, CBuilder::ADVICE_DONTNEED);
-    kb->setScalarField("buffer", kb->CreateGEP(readableBuffer, unnecessaryBytes));
-    kb->CreateBr(checkRemaining);
+    kb->CreateMAdvise(kb->CreateIntToPtr(readableBuffer, voidPtrTy), unnecessaryBytes, CBuilder::ADVICE_DONTNEED);
+    readableBuffer = kb->CreateIntToPtr(kb->CreateAdd(readableBuffer, unnecessaryBytes), voidPtrTy);
+    kb->setScalarField("readableBuffer", readableBuffer);
+    kb->CreateBr(processSegment);
 
     // determine whether or not we've exhausted the file buffer
-    kb->SetInsertPoint(checkRemaining);
-    Value * const remaining = kb->CreateSub(fileSize, consumed);
-    Value * const lastPage = kb->CreateICmpULE(remaining, pageSize);
-    kb->CreateUnlikelyCondBr(lastPage, setTermination, exit);
-
+    kb->SetInsertPoint(processSegment);
+    ConstantInt * segmentItems = kb->getSize(mSegmentBlocks * kb->getBitBlockWidth());
+    Value * const fileSize = kb->getScalarField("fileSize");
+    Value * const produced = kb->CreateAdd(kb->getProducedItemCount("sourceBuffer"), segmentItems);
+    Value * const lessThanFullSegment = kb->CreateICmpULT(fileSize, produced);
+    kb->CreateUnlikelyCondBr(lessThanFullSegment, setTermination, mmapSourceExit);
     kb->SetInsertPoint(setTermination);
+
     kb->setTerminationSignal();
-    kb->CreateBr(exit);
+    kb->CreateBr(mmapSourceExit);
 
     // finally, set the "produced" count to reflect current position in the file
-    kb->SetInsertPoint(exit);
+    kb->SetInsertPoint(mmapSourceExit);
+    PHINode * itemsRead = kb->CreatePHI(produced->getType(), 2);
+    itemsRead->addIncoming(produced, processSegment);
+    itemsRead->addIncoming(fileSize, setTermination);
+    kb->setProducedItemCount("sourceBuffer", itemsRead);
 }
 
-void MMapSourceKernel::unmapSourceBuffer(const std::unique_ptr<KernelBuilder> & kb) {
+void MMapSourceKernel::generateFinalizeMethod(const std::unique_ptr<KernelBuilder> & kb) {
     kb->CreateMUnmap(kb->getBaseAddress("sourceBuffer"), kb->getBufferedSize("sourceBuffer"));
+}
+
+MMapSourceKernel::MMapSourceKernel(const std::unique_ptr<kernel::KernelBuilder> & kb, unsigned blocksPerSegment, unsigned codeUnitWidth)
+: SegmentOrientedKernel("mmap_source" + std::to_string(blocksPerSegment) + "@" + std::to_string(codeUnitWidth),
+{},
+{Binding{kb->getStreamSetTy(1, codeUnitWidth), "sourceBuffer"}},
+{Binding{kb->getInt32Ty(), "fileDescriptor"}},
+{Binding{kb->getSizeTy(), "fileSize"}}, {Binding{kb->getVoidPtrTy(), "readableBuffer"}})
+, mSegmentBlocks(blocksPerSegment)
+, mCodeUnitWidth(codeUnitWidth)
+, mFileSizeFunction(nullptr) {
+
 }
 
 /// READ SOURCE KERNEL
 
-void ReadSourceKernel::generateInitializeMethod(const unsigned codeUnitWidth, const unsigned stride, const std::unique_ptr<KernelBuilder> & b) {
-    const unsigned pageSize = getpagesize();
-    const auto bufferSize = std::max(pageSize * 8, codegen::SegmentSize * stride  * 4);
-    ConstantInt * const bufferItems = b->getSize(bufferSize);
-    const auto codeUnitSize = codeUnitWidth / 8;
-    ConstantInt * const bufferBytes = b->getSize(bufferSize * codeUnitSize);
-    PointerType * const codeUnitPtrTy = b->getIntNTy(codeUnitWidth)->getPointerTo();
-    Value * const buffer = b->CreatePointerCast(b->CreateCacheAlignedMalloc(bufferBytes), codeUnitPtrTy);
-    b->setBaseAddress("sourceBuffer", buffer);
-    b->setScalarField("buffer", buffer);
-    b->setCapacity("sourceBuffer", bufferItems);
+void ReadSourceKernel::generateInitializeMethod(const std::unique_ptr<KernelBuilder> & kb) {
+    const size_t initialBufferSize = 8 * getpagesize() * mCodeUnitWidth;
+    ConstantInt * const bufferBytes = kb->getSize(initialBufferSize * mCodeUnitWidth/8);
+    PointerType * const codeUnitPtrTy = IntegerType::get(kb->getContext(), mCodeUnitWidth)->getPointerTo();
+    Value * const buffer = kb->CreatePointerCast(kb->CreateCacheAlignedMalloc(bufferBytes), codeUnitPtrTy);
+    kb->setScalarField("buffer", buffer);
+    kb->setScalarField("capacity", kb->getSize(initialBufferSize));
+    kb->setBaseAddress("sourceBuffer", buffer);
+    kb->setBufferedSize("sourceBuffer", kb->getSize(0));
+    kb->setCapacity("sourceBuffer", kb->getSize(initialBufferSize));
 }
 
-void ReadSourceKernel::generateDoSegmentMethod(const unsigned codeUnitWidth, const unsigned stride, const std::unique_ptr<KernelBuilder> & b) {
+void ReadSourceKernel::generateDoSegmentMethod(const std::unique_ptr<KernelBuilder> & kb) {
 
-    const unsigned pageSize = getpagesize();
-    ConstantInt * const itemsToRead = b->getSize(std::max(pageSize, codegen::SegmentSize * stride * 2));
-    ConstantInt * const codeUnitBytes = b->getSize(codeUnitWidth / 8);
-    ConstantInt * const itemsPerSegment = b->getSize(codegen::SegmentSize * stride);
+    ConstantInt * const readSize = kb->getSize(getpagesize() * 8/mCodeUnitWidth);
+    PointerType * const codeUnitPtrTy = IntegerType::get(kb->getContext(), mCodeUnitWidth)->getPointerTo();
+    PointerType * const i8PtrTy = IntegerType::get(kb->getContext(), 8)->getPointerTo();
+    ConstantInt * const codeUnitBytes = kb->getSize(mCodeUnitWidth/8);
+    BasicBlock * const entryBlock = kb->GetInsertBlock();
+    BasicBlock * const exhaustedBuffer = kb->CreateBasicBlock("ExhaustedBuffer");
+    BasicBlock * const waitOnConsumers = kb->CreateBasicBlock("WaitOnConsumers");
+    BasicBlock * const readData = kb->CreateBasicBlock("ReadData");
+    BasicBlock * const stdInExit = kb->CreateBasicBlock("StdInExit");
 
-    BasicBlock * const entry = b->GetInsertBlock();
-    BasicBlock * const checkData = b->CreateBasicBlock("CheckData");
-    BasicBlock * const moveData = b->CreateBasicBlock("MoveData");
-    BasicBlock * const prepareBuffer = b->CreateBasicBlock("PrepareBuffer");
-    BasicBlock * const readData = b->CreateBasicBlock("ReadData");
-    BasicBlock * const setTermination = b->CreateBasicBlock("SetTermination");
-    BasicBlock * const readExit = b->CreateBasicBlock("ReadExit");
+    assert(kb->getKernel() == this);
 
-    // Do we have enough unread data to support one segment?
-    Value * const produced = b->getProducedItemCount("sourceBuffer");
-    Value * const buffered = b->getBufferedSize("sourceBuffer");
-    Value * const itemsPending = b->CreateAdd(produced, itemsPerSegment);
+    // Check whether we need to read another page of data
+    ConstantInt * const segmentSize = kb->getSize(mSegmentBlocks * kb->getBitBlockWidth());
+    Value * bufferedSize = kb->getBufferedSize("sourceBuffer");
+    Value * const produced = kb->getProducedItemCount("sourceBuffer");
+    Value * unreadSize = kb->CreateSub(bufferedSize, produced);
+    kb->CreateUnlikelyCondBr(kb->CreateICmpULT(unreadSize, segmentSize), exhaustedBuffer, stdInExit);
 
-    b->CreateLikelyCondBr(b->CreateICmpULT(itemsPending, buffered), readExit, checkData);
+    // If so, it checks whether it can simply append another page to the existing buffer or whether
+    // we need to perform a copyback.
 
-    // Can we append to our existing buffer without impacting any subsequent kernel?
-    b->SetInsertPoint(checkData);
-    Value * const capacity = b->getCapacity("sourceBuffer");
-    Value * const readEnd = b->getRawOutputPointer("sourceBuffer", b->CreateAdd(buffered, itemsToRead));
-    Value * const baseBuffer = b->getScalarField("buffer");
-    Value * const bufferLimit = b->CreateGEP(baseBuffer, capacity);
-    b->CreateLikelyCondBr(b->CreateICmpULE(readEnd, bufferLimit), readData, moveData);
+    kb->SetInsertPoint(exhaustedBuffer);
+
+    // Otherwise, we're going to have to perform a copy back...
+
+    // Let L be the logical buffer address (i.e., the position of the "first code unit" of the input stream)
+    // and B be the address pointing to the beginning of our actual buffer. Check whether:
+
+    //     L + produced + readSize < B + capacity
+
+    // If so, we can append to our existing buffer without impacting any subsequent kernel.
+
+    Value * inputStream = kb->getRawOutputPointer("sourceBuffer", kb->getInt32(0), kb->getInt32(0));
+    Value * const originalPtr = kb->CreateGEP(inputStream, produced);
+
+    Value * const buffer = kb->getScalarField("buffer");
+    Value * const capacity = kb->getScalarField("capacity");
+
+    Value * L = kb->CreateGEP(originalPtr, readSize);
+    Value * B = kb->CreateGEP(buffer, capacity);
+    Value * const canAppend = kb->CreateICmpULT(L, B);
+    kb->CreateLikelyCondBr(canAppend, readData, waitOnConsumers);
 
     // First wait on any consumers to finish processing then check how much data has been consumed.
-    b->SetInsertPoint(moveData);
-    b->CreateConsumerWait();
+    kb->SetInsertPoint(waitOnConsumers);
+    kb->CreateConsumerWait();
 
     // Then determine how much data has been consumed and how much needs to be copied back, noting
     // that our "unproduced" data must be block aligned.
-    BasicBlock * const copyBack = b->CreateBasicBlock("CopyBack");
-    BasicBlock * const expandAndCopyBack = b->CreateBasicBlock("ExpandAndCopyBack");
+    const size_t blockAlignment = kb->getBitBlockWidth() / 8;
+    Constant * const alignmentMask = kb->getSize(-(blockAlignment * 8 / mCodeUnitWidth));
+    Value * const consumed = kb->CreateAnd(kb->getConsumedItemCount("sourceBuffer"), alignmentMask);
+    Value * const remaining = kb->CreateSub(bufferedSize, consumed);
+    Value * const unconsumedPtr = kb->CreateGEP(inputStream, consumed);
+    Value * const consumedMajority = kb->CreateICmpULT(kb->CreateGEP(buffer, remaining), unconsumedPtr);
+    Value * target = buffer;
+    Value * source = unconsumedPtr;
+    Value * toCopy = remaining;
+    if (mCodeUnitWidth != 8) {
+        source = kb->CreatePointerCast(unconsumedPtr, i8PtrTy);
+        toCopy = kb->CreateMul(remaining, codeUnitBytes);
+    }
 
-    const auto blockSize = b->getBitBlockWidth() / 8;
-    Constant * const blockSizeAlignmentMask = ConstantExpr::getNeg(b->getSize(blockSize));
-    Value * const consumed = b->getConsumedItemCount("sourceBuffer");
-    Value * const offset = b->CreateAnd(consumed, blockSizeAlignmentMask);
-    Value * const unreadData = b->getRawOutputPointer("sourceBuffer", offset);
-    Value * const remainingItems = b->CreateSub(buffered, offset);
-    Value * const remainingBytes = b->CreateMul(remainingItems, codeUnitBytes);
+    BasicBlock * const copyBack = kb->CreateBasicBlock("CopyBack");
+    BasicBlock * const expandAndCopyBack = kb->CreateBasicBlock("ExpandAndCopyBack");
+    BasicBlock * const calculateLogicalAddress = kb->CreateBasicBlock("CalculateLogicalAddress");
 
-    // Have we consumed enough data that we can safely copy back the unconsumed data without needing a temporary buffer?
-    Value * const canCopy = b->CreateICmpULT(b->CreateGEP(baseBuffer, remainingItems), b->getRawOutputPointer("sourceBuffer", offset));
-    b->CreateLikelyCondBr(canCopy, copyBack, expandAndCopyBack);
-
+    // Have we consumed enough data that we can safely copy back the unconsumed data without needing
+    // a temporary buffer? (i.e., B + remaining < L + consumed)
+    kb->CreateLikelyCondBr(consumedMajority, copyBack, expandAndCopyBack);
+    kb->SetInsertPoint(copyBack);
     // If so, just copy the data ...
-    b->SetInsertPoint(copyBack);
-    b->CreateMemCpy(baseBuffer, unreadData, remainingBytes, blockSize);
-    b->CreateBr(prepareBuffer);
-
+    if (mCodeUnitWidth != 8) {
+        target = kb->CreatePointerCast(buffer, i8PtrTy);
+    }
+    kb->CreateMemCpy(target, source, toCopy, 1);
+    kb->CreateBr(calculateLogicalAddress);
+    
     // Otherwise, allocate a buffer with twice the capacity and copy the unconsumed data back into it
-    b->SetInsertPoint(expandAndCopyBack);
-    Value * const expandedCapacity = b->CreateShl(capacity, 1);
-    Value * const expandedBytes = b->CreateMul(expandedCapacity, codeUnitBytes);
-    Value * const expandedBuffer = b->CreatePointerCast(b->CreateCacheAlignedMalloc(expandedBytes), unreadData->getType());
-    b->CreateMemCpy(expandedBuffer, unreadData, remainingBytes, blockSize);
-    b->setScalarField("buffer", expandedBuffer);
-    b->setCapacity("sourceBuffer", expandedCapacity);
-    b->CreateFree(baseBuffer);
-    b->CreateBr(prepareBuffer);
+    kb->SetInsertPoint(expandAndCopyBack);
+    Value * const expandedCapacity = kb->CreateShl(capacity, 1);
+    Value * const expandedBytes = mCodeUnitWidth == 8 ? expandedCapacity : kb->CreateMul(expandedCapacity, codeUnitBytes);
+    Value * const expandedBuffer = kb->CreatePointerCast(kb->CreateCacheAlignedMalloc(expandedBytes), codeUnitPtrTy);
+    target = mCodeUnitWidth == 8 ? expandedBuffer : kb->CreatePointerCast(expandedBuffer, i8PtrTy);
+    kb->CreateMemCpy(target, source, toCopy, 1);
+    kb->CreateFree(buffer);
+    kb->setScalarField("buffer", expandedBuffer);
+    kb->setScalarField("capacity", expandedCapacity);
+    kb->setCapacity("sourceBuffer", expandedCapacity);
+    kb->CreateBr(calculateLogicalAddress);
 
-    b->SetInsertPoint(prepareBuffer);
-    PHINode * newBaseBuffer = b->CreatePHI(baseBuffer->getType(), 2);
-    newBaseBuffer->addIncoming(baseBuffer, copyBack);
-    newBaseBuffer->addIncoming(expandedBuffer, expandAndCopyBack);
-    b->setBaseAddress("sourceBuffer", b->CreateGEP(newBaseBuffer, b->CreateNeg(offset)));
-    b->CreateBr(readData);
+    // Update the logical address for this buffer....
+    kb->SetInsertPoint(calculateLogicalAddress);
+    PHINode * const baseAddress = kb->CreatePHI(codeUnitPtrTy, 2);
+    baseAddress->addIncoming(buffer, copyBack);
+    baseAddress->addIncoming(expandedBuffer, expandAndCopyBack);
+    Value * const logicalAddress = kb->CreateGEP(baseAddress, kb->CreateNeg(consumed));
+    Value * const modifiedPtr = kb->CreateGEP(baseAddress, remaining);
+    kb->setBaseAddress("sourceBuffer", logicalAddress);
+    kb->CreateBr(readData);
 
     // Regardless of whether we're simply appending data or had to allocate a new buffer, read a new page
-    // of data into the input source buffer. If we fail to read a full page ...
-    b->SetInsertPoint(readData);
-    Value * const sourceBuffer = b->getRawOutputPointer("sourceBuffer", buffered);
-    Value * const fd = b->getScalarField("fileDescriptor");
-    Constant * const bytesToRead = ConstantExpr::getMul(itemsToRead, codeUnitBytes);
-    Value * const bytesRead = b->CreateReadCall(fd, sourceBuffer, bytesToRead);
-    Value * const itemsRead = b->CreateUDiv(bytesRead, codeUnitBytes);
-    Value * const itemsBuffered = b->CreateAdd(buffered, itemsRead);
-    b->setBufferedSize("sourceBuffer", itemsBuffered);
-    b->CreateUnlikelyCondBr(b->CreateICmpULT(itemsBuffered, itemsPending), setTermination, readExit);
+    // of data into the input source buffer. If we fail to read a full segment ...
+    readData->moveAfter(calculateLogicalAddress);
+    kb->SetInsertPoint(readData);
+    calculateLogicalAddress->moveAfter(calculateLogicalAddress);
+    PHINode * const addr = kb->CreatePHI(codeUnitPtrTy, 2);
+    addr->addIncoming(originalPtr, exhaustedBuffer);
+    addr->addIncoming(modifiedPtr, calculateLogicalAddress);
+    assert(kb->getKernel() == this);
+    Value * const fd = kb->getScalarField("fileDescriptor");
+    Value * toRead = readSize;
+    if (mCodeUnitWidth != 8) {
+        toRead = kb->CreateMul(toRead, codeUnitBytes);
+    }
+    Value * bytesRead = kb->CreateReadCall(fd, addr, toRead);
+    Value * itemsRead = bytesRead;
+    if (mCodeUnitWidth != 8) {
+        itemsRead = kb->CreateUDiv(bytesRead, codeUnitBytes);
+    }
+    unreadSize = kb->CreateAdd(unreadSize, itemsRead);
+    bufferedSize = kb->CreateAdd(bufferedSize, itemsRead);
+    kb->setBufferedSize("sourceBuffer", bufferedSize);
+    Value * const exhaustedInputSource = kb->CreateICmpULT(unreadSize, segmentSize);
+    BasicBlock * const setTermination = kb->CreateBasicBlock("SetTermination");
+    kb->CreateUnlikelyCondBr(exhaustedInputSource, setTermination, stdInExit);
 
-    // ... set the termination signal.
-    b->SetInsertPoint(setTermination);
-    Value * const bytesToZero = b->CreateMul(b->CreateSub(itemsPending, itemsBuffered), codeUnitBytes);
-    b->CreateMemZero(b->getRawOutputPointer("sourceBuffer", itemsBuffered), bytesToZero);
-    b->setTerminationSignal();
-    b->CreateBr(readExit);
+    // ... zero out the remaining bytes and set the termination signal.
+    kb->SetInsertPoint(setTermination);
+    Value * bytesToZero = kb->CreateSub(segmentSize, unreadSize);
+    Value * unreadPtr = kb->CreateGEP(addr, unreadSize);
+    bytesToZero = mCodeUnitWidth == 8 ? bytesToZero : kb->CreateMul(bytesToZero, codeUnitBytes);
+    if (mCodeUnitWidth != 8) {
+        bytesToZero = kb->CreateMul(bytesToZero, codeUnitBytes);
+        unreadPtr = kb->CreatePointerCast(unreadPtr, i8PtrTy);
+    }
+    kb->CreateMemZero(unreadPtr, bytesToZero);
+    kb->setTerminationSignal();
+    kb->CreateBr(stdInExit);
 
-    readExit->moveAfter(setTermination);
-    b->SetInsertPoint(readExit);
-    PHINode * const itemsProduced = b->CreatePHI(itemsPending->getType(), 3);
-    itemsProduced->addIncoming(itemsPending, entry);
-    itemsProduced->addIncoming(itemsPending, readData);
-    itemsProduced->addIncoming(itemsBuffered, setTermination);
-    b->setProducedItemCount("sourceBuffer", itemsProduced);
+    // finally add the segment item count to the produced item count to inform the subsequent kernels how
+    // much data is available for processing
+    kb->SetInsertPoint(stdInExit);
+    stdInExit->moveAfter(setTermination);
+    PHINode * const items = kb->CreatePHI(produced->getType(), 3);
+    items->addIncoming(segmentSize, entryBlock);
+    items->addIncoming(segmentSize, readData);
+    items->addIncoming(unreadSize, setTermination);
+    kb->setProducedItemCount("sourceBuffer", kb->CreateAdd(produced, items));
 }
 
-void ReadSourceKernel::freeBuffer(const std::unique_ptr<KernelBuilder> & kb) {
+void ReadSourceKernel::generateFinalizeMethod(const std::unique_ptr<KernelBuilder> & kb) {
     kb->CreateFree(kb->getScalarField("buffer"));
 }
 
-/// Hybrid MMap/Read source kernel
+ReadSourceKernel::ReadSourceKernel(const std::unique_ptr<kernel::KernelBuilder> & kb, unsigned blocksPerSegment, unsigned codeUnitWidth)
+: SegmentOrientedKernel("read_source"
+, {}
+, {Binding{kb->getStreamSetTy(1, codeUnitWidth), "sourceBuffer"}}
+, {Binding{kb->getInt32Ty(), "fileDescriptor"}}
+, {}
+, {Binding{IntegerType::get(kb->getContext(), codeUnitWidth)->getPointerTo(), "buffer"}, Binding{kb->getSizeTy(), "capacity"}})
+, mSegmentBlocks(blocksPerSegment)
+, mCodeUnitWidth(codeUnitWidth) {
 
-void FDSourceKernel::linkExternalMethods(const std::unique_ptr<kernel::KernelBuilder> & kb) {
-    mFileSizeFunction = MMapSourceKernel::linkFileSizeMethod(kb);
-}
-
-void FDSourceKernel::generateFinalizeMethod(const std::unique_ptr<KernelBuilder> & kb) {
-    BasicBlock * finalizeRead = kb->CreateBasicBlock("finalizeRead");
-    BasicBlock * finalizeMMap = kb->CreateBasicBlock("finalizeMMap");
-    BasicBlock * finalizeDone = kb->CreateBasicBlock("finalizeDone");
-    kb->CreateCondBr(kb->CreateTrunc(kb->getScalarField("useMMap"), kb->getInt1Ty()), finalizeMMap, finalizeRead);
-    kb->SetInsertPoint(finalizeMMap);
-    MMapSourceKernel::unmapSourceBuffer(kb);
-    kb->CreateBr(finalizeDone);
-    kb->SetInsertPoint(finalizeRead);
-    ReadSourceKernel::freeBuffer(kb);
-    kb->CreateBr(finalizeDone);
-    kb->SetInsertPoint(finalizeDone);
-}
-
-void FDSourceKernel::generateInitializeMethod(const std::unique_ptr<KernelBuilder> & kb) {
-    BasicBlock * initializeRead = kb->CreateBasicBlock("initializeRead");
-    BasicBlock * tryMMap = kb->CreateBasicBlock("tryMMap");
-    BasicBlock * initializeMMap = kb->CreateBasicBlock("initializeMMap");
-    BasicBlock * initializeDone = kb->CreateBasicBlock("initializeDone");
-    // The source will use MMapSource or readSoure kernel logic depending on the useMMap
-    // parameter, possibly overridden.
-    Value * useMMap = kb->CreateTrunc(kb->getScalarField("useMMap"), kb->getInt1Ty());
-    // if the fileDescriptor is 0, the file is stdin, use readSource kernel logic.
-    Value * fd = kb->getScalarField("fileDescriptor");
-    useMMap = kb->CreateAnd(useMMap, kb->CreateICmpNE(fd, kb->getInt32(STDIN_FILENO)));
-    kb->CreateCondBr(useMMap, tryMMap, initializeRead);
-    
-    kb->SetInsertPoint(tryMMap);
-    // If the fileSize is 0, we may have a virtual file such as /proc/cpuinfo
-    Value * fileSize = kb->CreateZExtOrTrunc(kb->CreateCall(mFileSizeFunction, fd), kb->getSizeTy());
-    useMMap = kb->CreateICmpNE(fileSize, kb->getSize(0));
-    kb->CreateCondBr(useMMap, initializeMMap, initializeRead);
-    kb->SetInsertPoint(initializeMMap);
-    MMapSourceKernel::generateInitializeMethod(mFileSizeFunction, mCodeUnitWidth, kb);
-    kb->CreateBr(initializeDone);
-
-    kb->SetInsertPoint(initializeRead);
-    // Ensure that readSource logic is used throughout.
-    kb->setScalarField("useMMap", kb->getInt8(0));
-    ReadSourceKernel::generateInitializeMethod(mCodeUnitWidth, getStride(), kb);
-    kb->CreateBr(initializeDone);
-    kb->SetInsertPoint(initializeDone);
-}
-
-void FDSourceKernel::generateDoSegmentMethod(const std::unique_ptr<KernelBuilder> & kb) {
-    BasicBlock * DoSegmentRead = kb->CreateBasicBlock("DoSegmentRead");
-    BasicBlock * DoSegmentMMap = kb->CreateBasicBlock("DoSegmentMMap");
-    BasicBlock * DoSegmentDone = kb->CreateBasicBlock("DoSegmentDone");
-    kb->CreateCondBr(kb->CreateTrunc(kb->getScalarField("useMMap"), kb->getInt1Ty()), DoSegmentMMap, DoSegmentRead);
-    kb->SetInsertPoint(DoSegmentMMap);
-    MMapSourceKernel::generateDoSegmentMethod(mCodeUnitWidth, kb);
-    kb->CreateBr(DoSegmentDone);
-    kb->SetInsertPoint(DoSegmentRead);
-    ReadSourceKernel::generateDoSegmentMethod(mCodeUnitWidth, getStride(), kb);
-    kb->CreateBr(DoSegmentDone);
-    kb->SetInsertPoint(DoSegmentDone);
 }
 
 /// MEMORY SOURCE KERNEL
 
 void MemorySourceKernel::generateInitializeMethod(const std::unique_ptr<KernelBuilder> & kb) {
-    Value * const fileSource = kb->getScalarField("fileSource");
-    kb->setBaseAddress("sourceBuffer", fileSource);
-    Value * const fileSize = kb->getScalarField("fileSize");
-    Value * const fileItems = kb->CreateUDiv(fileSize, kb->getSize(mCodeUnitWidth / 8));
-    kb->setBufferedSize("sourceBuffer", fileItems);
-    kb->setCapacity("sourceBuffer", fileItems);
-    kb->setProducedItemCount("sourceBuffer", fileItems);
-    kb->setTerminationSignal();
+    kb->setBaseAddress("sourceBuffer", kb->CreatePointerCast(kb->getScalarField("fileSource"), kb->getVoidPtrTy()));
+    kb->setBufferedSize("sourceBuffer", kb->getScalarField("fileSize"));
+    kb->setCapacity("sourceBuffer", kb->getScalarField("fileSize"));
 }
 
 void MemorySourceKernel::generateDoSegmentMethod(const std::unique_ptr<KernelBuilder> & kb) {
 
+    BasicBlock * entryBlock = kb->GetInsertBlock();
+    BasicBlock * setTermination = kb->CreateBasicBlock("setTermination");
+    BasicBlock * mmapSourceExit = kb->CreateBasicBlock("sourceExit");
+    ConstantInt * segmentItems = kb->getSize(mSegmentBlocks * kb->getBitBlockWidth());
+    Value * fileItems = kb->getScalarField("fileSize");
+    if (mCodeUnitWidth > 8) {
+        fileItems = kb->CreateUDiv(fileItems, kb->getSize(mCodeUnitWidth / 8));
+    }
+    Value * produced = kb->getProducedItemCount("sourceBuffer");
+    produced = kb->CreateAdd(produced, segmentItems);
+    Value * lessThanFullSegment = kb->CreateICmpULT(fileItems, produced);
+    kb->CreateCondBr(lessThanFullSegment, setTermination, mmapSourceExit);
+    kb->SetInsertPoint(setTermination);
+    kb->setTerminationSignal();
+    kb->CreateBr(mmapSourceExit);
+
+    kb->SetInsertPoint(mmapSourceExit);
+
+    PHINode * itemsRead = kb->CreatePHI(produced->getType(), 2);
+    itemsRead->addIncoming(produced, entryBlock);
+    itemsRead->addIncoming(fileItems, setTermination);
+    kb->setProducedItemCount("sourceBuffer", itemsRead);
 }
 
-MMapSourceKernel::MMapSourceKernel(const std::unique_ptr<kernel::KernelBuilder> & b, const unsigned codeUnitWidth)
-: SegmentOrientedKernel("mmap_source@" + std::to_string(codeUnitWidth),
-{},
-{Binding{b->getStreamSetTy(1, codeUnitWidth), "sourceBuffer", FixedRate(), Deferred()}},
-{Binding{b->getInt32Ty(), "fileDescriptor"}},
-{Binding{b->getSizeTy(), "fileSize"}}, {Binding{b->getIntNTy(codeUnitWidth)->getPointerTo(), "buffer"}})
-, mCodeUnitWidth(codeUnitWidth)
-, mFileSizeFunction(nullptr) {
-    addAttribute(MustExplicitlyTerminate());
-}
-
-
-ReadSourceKernel::ReadSourceKernel(const std::unique_ptr<kernel::KernelBuilder> & b, const unsigned codeUnitWidth)
-: SegmentOrientedKernel("read_source" + std::to_string(codegen::SegmentSize) + "@" + std::to_string(codeUnitWidth)
-, {}
-, {Binding{b->getStreamSetTy(1, codeUnitWidth), "sourceBuffer", FixedRate(), Deferred()}}
-, {Binding{b->getInt32Ty(), "fileDescriptor"}}
-, {}
-, {Binding{b->getIntNTy(codeUnitWidth)->getPointerTo(), "buffer"}})
-, mCodeUnitWidth(codeUnitWidth) {
-    addAttribute(MustExplicitlyTerminate());
-}
-
-
-FDSourceKernel::FDSourceKernel(const std::unique_ptr<kernel::KernelBuilder> & kb, const unsigned codeUnitWidth)
-: SegmentOrientedKernel("FD_source@" + std::to_string(codeUnitWidth)
-, {}
-, {Binding{kb->getStreamSetTy(1, codeUnitWidth), "sourceBuffer", FixedRate(), Deferred()}}
-, {Binding{kb->getInt8Ty(), "useMMap"}, Binding{kb->getInt32Ty(), "fileDescriptor"}}
-, {}
-, {Binding{kb->getIntNTy(codeUnitWidth)->getPointerTo(), "buffer"}, Binding{kb->getSizeTy(), "fileSize"}})
-, mCodeUnitWidth(codeUnitWidth)
-, mFileSizeFunction(nullptr) {
-    addAttribute(MustExplicitlyTerminate());
-}
-
-MemorySourceKernel::MemorySourceKernel(const std::unique_ptr<kernel::KernelBuilder> & kb, Type * const type, const unsigned codeUnitWidth)
+MemorySourceKernel::MemorySourceKernel(const std::unique_ptr<kernel::KernelBuilder> & kb, Type * type, unsigned blocksPerSegment, unsigned codeUnitWidth)
 : SegmentOrientedKernel("memory_source",
     {},
     {Binding{kb->getStreamSetTy(1, codeUnitWidth), "sourceBuffer"}},
     {Binding{cast<PointerType>(type), "fileSource"}, Binding{kb->getSizeTy(), "fileSize"}}, {}, {})
+, mSegmentBlocks(blocksPerSegment)
 , mCodeUnitWidth(codeUnitWidth) {
-    addAttribute(MustExplicitlyTerminate());
+
 }
 
 }

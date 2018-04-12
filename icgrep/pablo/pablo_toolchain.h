@@ -13,20 +13,16 @@ namespace pablo { class PabloKernel; }
 namespace pablo {
 
 enum PabloDebugFlags {
-    VerifyPablo, DumpTrace,
+    ShowPablo, ShowOptimizedPablo, VerifyPablo, DumpTrace,
 };
-extern std::string ShowOptimizedPabloOption;
-extern std::string ShowPabloOption;
 
 enum PabloCompilationFlags {
-    DisableSimplification, DisableCodeMotion, EnableDistribution, EnableSchedulingPrePass, EnableProfiling
+    DisableSimplification, DisableCodeMotion, EnableDistribution, EnableSchedulingPrePass
 };
     
 const llvm::cl::OptionCategory * pablo_toolchain_flags();
 
-bool DebugOptionIsSet(const PabloDebugFlags flag);
-
-bool CompileOptionIsSet(const PabloCompilationFlags flag);
+bool DebugOptionIsSet(PabloDebugFlags flag);
 
 void pablo_function_passes(PabloKernel * kernel);
 

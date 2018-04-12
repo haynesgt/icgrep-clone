@@ -1,21 +1,17 @@
 /*
- *  Copyright (c) 2018 International Characters.
+ *  Copyright (c) 2016 International Characters.
  *  This software is licensed to the public under the Open Software License 3.0.
  */
 
 #include "s2p_kernel.h"
 #include <kernels/kernel_builder.h>
-#include <pablo/pabloAST.h>
-#include <pablo/builder.hpp>
-#include <pablo/pe_pack.h>
-
 #include <llvm/Support/raw_ostream.h>
 
 using namespace llvm;
 
 namespace kernel {
 
-const int PACK_LANES = 2;
+const int PACK_LANES = 1;
 
 void s2p_step(const std::unique_ptr<KernelBuilder> & iBuilder, Value * s0, Value * s1, Value * hi_mask, unsigned shift, Value * &p0, Value * &p1) {
     Value * t0 = nullptr;
@@ -115,47 +111,7 @@ void generateS2P_16Kernel(const std::unique_ptr<KernelBuilder> & iBuilder, Kerne
     }
 }    
 #endif
-#ifdef S2P_MULTIBLOCK
-
-void S2PKernel::generateMultiBlockLogic(const std::unique_ptr<KernelBuilder> & kb) {
-    BasicBlock * entry = kb->GetInsertBlock();
-    BasicBlock * processBlock = kb->CreateBasicBlock("processBlock");
-    BasicBlock * s2pDone = kb->CreateBasicBlock("s2pDone");
     
-    Function::arg_iterator args = mCurrentMethod->arg_begin();
-    args++; //self
-    Value * itemsToDo = &*(args++);
-    // Get pointer to start of the StreamSetBlock containing unprocessed input items.
-    Value * byteStreamPtr = &*(args++);
-    Value * basisBitsPtr = &*(args++);
-    
-    Constant * blockWidth = kb->getSize(kb->getBitBlockWidth());
-    Value * blocksToDo = kb->CreateUDivCeil(itemsToDo, blockWidth); // 1 if this is the final block
-    
-    kb->CreateBr(processBlock);
-    
-    kb->SetInsertPoint(processBlock);
-    PHINode * blockOffsetPhi = kb->CreatePHI(kb->getSizeTy(), 2); // block offset from the base block, e.g. 0, 1, 2, ...
-    blockOffsetPhi->addIncoming(kb->getSize(0), entry);
-
-    Value * bytePackPtr = kb->CreateGEP(byteStreamPtr, {blockOffsetPhi, kb->getInt32(0), kb->getInt32(0)});
-    Value * basisBlockPtr = kb->CreateGEP(basisBitsPtr, blockOffsetPhi);
-    Value * bytepack[8];
-    for (unsigned i = 0; i < 8; i++) {
-        bytepack[i] = kb->CreateBlockAlignedLoad(kb->CreateGEP(bytePackPtr, kb->getInt32(i)));
-    }
-    Value * basisbits[8];
-    s2p(kb, bytepack, basisbits);
-    for (unsigned basis_idx = 0; basis_idx < 8; ++basis_idx) {
-        kb->CreateBlockAlignedStore(basisbits[basis_idx], kb->CreateGEP(basisBlockPtr, {kb->getSize(0), kb->getInt32(basis_idx)}));
-    }
-    Value * nextBlk = kb->CreateAdd(blockOffsetPhi, kb->getSize(1));
-    Value * moreToDo = kb->CreateICmpULT(blockOffsetPhi, blocksToDo);
-    blockOffsetPhi->addIncoming(nextBlk, processBlock);
-    kb->CreateCondBr(moreToDo, processBlock, s2pDone);
-    kb->SetInsertPoint(s2pDone);
-}
-#else
 void S2PKernel::generateDoBlockMethod(const std::unique_ptr<KernelBuilder> & iBuilder) {
     Value * bytepack[8];
     for (unsigned i = 0; i < 8; i++) {
@@ -164,7 +120,7 @@ void S2PKernel::generateDoBlockMethod(const std::unique_ptr<KernelBuilder> & iBu
         } else {
             Value * ptr = iBuilder->getInputStreamPackPtr("byteStream", iBuilder->getInt32(0), iBuilder->getInt32(i));
             // CreateLoad defaults to aligned here, so we need to force the alignment to 1 byte.
-            bytepack[i] = iBuilder->CreateAlignedLoad(ptr, 1);            
+            bytepack[i] = iBuilder->CreateAlignedLoad(ptr, 1);
         }
     }
     Value * basisbits[8];
@@ -175,10 +131,11 @@ void S2PKernel::generateDoBlockMethod(const std::unique_ptr<KernelBuilder> & iBu
 }
 
 void S2PKernel::generateFinalBlockMethod(const std::unique_ptr<KernelBuilder> & iBuilder, Value * remainingBytes) {
-    // Prepare the s2p final block function:
-    // assumption: if remaining bytes is greater than 0, it is safe to read a full block of bytes.
-    //  if remaining bytes is zero, no read should be performed (e.g. for mmapped buffer).
- 
+    /* Prepare the s2p final block function:
+     assumption: if remaining bytes is greater than 0, it is safe to read a full block of bytes.
+     if remaining bytes is zero, no read should be performed (e.g. for mmapped buffer).
+     */
+    
     BasicBlock * finalPartialBlock = iBuilder->CreateBasicBlock("partial");
     BasicBlock * finalEmptyBlock = iBuilder->CreateBasicBlock("empty");
     BasicBlock * exitBlock = iBuilder->CreateBasicBlock("exit");
@@ -200,49 +157,12 @@ void S2PKernel::generateFinalBlockMethod(const std::unique_ptr<KernelBuilder> & 
     
     iBuilder->SetInsertPoint(exitBlock);
 }
-#endif
 
 S2PKernel::S2PKernel(const std::unique_ptr<KernelBuilder> & b, bool aligned)
-#ifdef S2P_MULTIBLOCK
-    : MultiBlockKernel(aligned ? "s2p" : "s2p_unaligned",
-#else
-	: BlockOrientedKernel(aligned ? "s2p" : "s2p_unaligned",
-#endif
-    {Binding{b->getStreamSetTy(1, 8), "byteStream", FixedRate(), Principal()}},
-    {Binding{b->getStreamSetTy(8, 1), "basisBits"}}, {}, {}, {}),
+: BlockOrientedKernel(aligned ? "s2p" : "s2p_unaligned",
+    {Binding{b->getStreamSetTy(1, 8), "byteStream"}}, {Binding{b->getStreamSetTy(8, 1), "basisBits"}}, {}, {}, {}),
   mAligned(aligned) {
-    if (!aligned) {
-        mStreamSetInputs[0].addAttribute(Misaligned());
-    }
+    setNoTerminateAttribute(true);
 }
-void S2P_PabloKernel::generatePabloMethod() {
-    pablo::PabloBlock * const pb = getEntryScope();
-    const unsigned steps = std::log2(mCodeUnitWidth);
-    std::vector<PabloAST *> streamSet[steps + 1];
-    for (unsigned i = 0; i <= steps; i++) {
-        streamSet[i].resize(1<<i);
-    }
-    streamSet[0][0] = pb->createExtract(getInputStreamVar("codeUnitStream"), pb->getInteger(0));
-    unsigned streamWidth = mCodeUnitWidth;
-    for (unsigned i = 1; i <= steps; i++) {
-        for (unsigned j = 0; j < streamSet[i-1].size(); j++) {
-            auto strm = streamSet[i-1][j];
-            streamSet[i][2*j] = pb->createPackL(pb->getInteger(streamWidth), strm);
-            streamSet[i][2*j+1] = pb->createPackH(pb->getInteger(streamWidth), strm);
-        }
-        streamWidth = streamWidth/2;
-    }
-    for (unsigned bit = 0; bit < mCodeUnitWidth; bit++) {
-        pb->createAssign(pb->createExtract(getOutputStreamVar("basisBits"), pb->getInteger(bit)), streamSet[steps][mCodeUnitWidth-1-bit]);
-    }
-}
-
-S2P_PabloKernel::S2P_PabloKernel(const std::unique_ptr<kernel::KernelBuilder> & b, const unsigned codeUnitWidth)
-: PabloKernel(b, "s2p_pablo" + std::to_string(codeUnitWidth),
-    {Binding{b->getStreamSetTy(1, codeUnitWidth), "codeUnitStream"}},
-    {Binding{b->getStreamSetTy(codeUnitWidth, 1), "basisBits"}}),
-  mCodeUnitWidth(codeUnitWidth) {
-}
-
 
 }

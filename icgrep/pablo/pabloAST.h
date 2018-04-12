@@ -22,6 +22,7 @@ namespace pablo {
 
 class PabloAST {
     friend class Statement;
+    friend class Variadic;
     friend class StatementList;
     friend class Branch;
     friend class PabloBlock;
@@ -43,8 +44,6 @@ public:
         return false;
     }
 
-    // NOTE: when adding new statement types, update Statement::getName() to generate
-    // a default name for the class.
     enum class ClassTypeId : unsigned {
         /** Expressions and Constants **/
         // Constants
@@ -53,7 +52,7 @@ public:
         // Arithmetic expressions
         , Add
         , Subtract
-        // Relational operators
+        // Relational expressions
         , LessThan
         , LessThanEquals
         , Equals
@@ -66,7 +65,7 @@ public:
         , String
         , Block
         , Kernel
-        , Extract
+        , Phi
         /** Statements **/
         // Boolean operations
         , And
@@ -76,7 +75,6 @@ public:
         , Sel
         // Stream operations
         , Advance
-        , IndexedAdvance
         , ScanThru
         , AdvanceThenScanThru
         , ScanTo
@@ -89,13 +87,10 @@ public:
         , Count
         // Variable assignments
         , Assign
-        // Scope branch statements
+        , Extract     
+        // Scope blocks
         , If
         , While
-        // Misc. operations
-        , Repeat
-        , PackH
-        , PackL
     };
 
     inline ClassTypeId getClassTypeId() const noexcept {
@@ -110,33 +105,33 @@ public:
         mType = type;
     }
 
-    inline user_iterator user_begin() noexcept {
+    inline user_iterator user_begin() {
         return mUsers.begin();
     }
 
-    inline user_iterator user_end() noexcept {
+    inline user_iterator user_end() {
         return mUsers.end();
     }
 
-    inline const_user_iterator user_begin() const noexcept {
+    inline const_user_iterator user_begin() const {
         return mUsers.cbegin();
     }
 
-    inline const_user_iterator user_end() const noexcept {
+    inline const_user_iterator user_end() const {
         return mUsers.cend();
     }
 
-    inline Users & users() noexcept {
+    inline Users & users() {
         return mUsers;
     }
 
-    inline const Users & users() const noexcept {
+    inline const Users & users() const {
         return mUsers;
     }
 
-    void replaceAllUsesWith(PabloAST * const expr) noexcept;
+    void replaceAllUsesWith(PabloAST * const expr);
 
-    inline Users::size_type getNumUses() const noexcept {
+    inline Users::size_type getNumUses() const {
         return mUsers.size();
     }
 
@@ -157,9 +152,9 @@ protected:
     , mUsers(allocator) {
 
     }
-    bool addUser(PabloAST * const user) noexcept;
+    bool addUser(PabloAST * const user);
 
-    bool removeUser(PabloAST * const user) noexcept;
+    bool removeUser(PabloAST * const user);
 
     virtual ~PabloAST() = default;
 
@@ -169,39 +164,25 @@ private:
     Users                   mUsers;
 };
 
-bool equals(const PabloAST * const expr1, const PabloAST * const expr2) noexcept;
+bool equals(const PabloAST * const expr1, const PabloAST * const expr2);
 
-bool dominates(const PabloAST * const expr1, const PabloAST * const expr2) noexcept;
+bool dominates(const PabloAST * const expr1, const PabloAST * const expr2);
 
-inline bool strictly_dominates(const PabloAST * const expr1, const PabloAST * const expr2) noexcept {
+inline bool strictly_dominates(const PabloAST * const expr1, const PabloAST * const expr2) {
     return (expr1 != expr2) && dominates(expr1, expr2);
 }
 
-bool postdominates(const PabloAST * const expr1, const PabloAST * const expr2) noexcept;
+bool postdominates(const PabloAST * const expr1, const PabloAST * const expr2);
 
-inline bool strictly_postdominates(const PabloAST * const expr1, const PabloAST * const expr2) noexcept {
+inline bool strictly_postdominates(const PabloAST * const expr1, const PabloAST * const expr2) {
     return (expr1 != expr2) && postdominates(expr1, expr2);
 }
 
-class String;
-
-class NamedPabloAST : public PabloAST {
-public:
-    virtual const String & getName() const = 0;
-    void setName(const String * const name);
-protected:
-    explicit NamedPabloAST(const ClassTypeId id, llvm::Type * const type, const String * const name, Allocator & allocator)
-    : PabloAST(id, type, allocator)
-    , mName(name) {
-
-    }
-protected:
-    mutable const String * mName;
-};
-
 class StatementList;
 
-class Statement : public NamedPabloAST {
+class String;
+
+class Statement : public PabloAST {
     friend class StatementList;
     friend class If;
     friend class While;
@@ -220,7 +201,13 @@ public:
 
     void replaceUsesOfWith(PabloAST * const from, PabloAST * const to);
 
-    inline PabloAST * getOperand(const unsigned index) const noexcept {
+    const String & getName() const noexcept {
+        return *mName;
+    }
+
+    void setName(const String * const name) noexcept;
+
+    inline PabloAST * getOperand(const unsigned index) const {
         assert (index < getNumOperands());
         return mOperand[index];
     }
@@ -233,9 +220,9 @@ public:
 
     void insertBefore(Statement * const statement);
     void insertAfter(Statement * const statement);
-    Statement * removeFromParent() noexcept;
-    Statement * eraseFromParent(const bool recursively = false) noexcept;
-    Statement * replaceWith(PabloAST * const expr, const bool rename = true, const bool recursively = false) noexcept;
+    Statement * removeFromParent();
+    Statement * eraseFromParent(const bool recursively = false);
+    Statement * replaceWith(PabloAST * const expr, const bool rename = true, const bool recursively = false);
 
     inline Statement * getNextNode() const {
         return mNext;
@@ -246,19 +233,17 @@ public:
     inline PabloBlock * getParent() const {
         return mParent;
     }
-
-    const String & getName() const final;
-
     virtual ~Statement() = default;
 
 protected:
 
     explicit Statement(const ClassTypeId id, llvm::Type * const type, std::initializer_list<PabloAST *> operands, const String * const name, Allocator & allocator)
-    : NamedPabloAST(id, type, name, allocator)
+    : PabloAST(id, type, allocator)
     , mOperands(operands.size())
     , mOperand(allocator.allocate(mOperands))
     , mNext(nullptr)
     , mPrev(nullptr)
+    , mName(name)
     , mParent(nullptr) {
         unsigned i = 0;
         for (PabloAST * const value : operands) {
@@ -269,12 +254,41 @@ protected:
         }
     }
 
+    explicit Statement(const ClassTypeId id, llvm::Type * const type, const unsigned reserved, const String * const name, Allocator & allocator)
+    : PabloAST(id, type, allocator)
+    , mOperands(0)
+    , mOperand(allocator.allocate(reserved))
+    , mNext(nullptr)
+    , mPrev(nullptr)
+    , mName(name)
+    , mParent(nullptr) {
+        std::memset(mOperand, 0, reserved * sizeof(PabloAST *));
+    }
+
+    template<typename iterator>
+    explicit Statement(const ClassTypeId id, llvm::Type * const type, iterator begin, iterator end, const String * const name, Allocator & allocator)
+    : PabloAST(id, type, allocator)
+    , mOperands(std::distance(begin, end))
+    , mOperand(allocator.allocate(mOperands))
+    , mNext(nullptr)
+    , mPrev(nullptr)
+    , mName(name)
+    , mParent(nullptr) {
+        unsigned i = 0;
+        for (auto value = begin; value != end; ++value, ++i) {
+            assert (*value);
+            mOperand[i] = *value;
+            (*value)->addUser(this);
+        }
+    }
+
 protected:    
-    const unsigned          mOperands;
-    PabloAST ** const       mOperand;
-    Statement *             mNext;
-    Statement *             mPrev;
-    PabloBlock *            mParent;
+    unsigned        mOperands;
+    PabloAST **     mOperand;
+    Statement *     mNext;
+    Statement *     mPrev;
+    const String *  mName;
+    PabloBlock *    mParent;
 };
 
 class CarryProducingStatement : public Statement {
@@ -283,7 +297,6 @@ public:
     static inline bool classof(const PabloAST * e) {
         switch (e->getClassTypeId()) {
             case PabloAST::ClassTypeId::Advance:
-            case PabloAST::ClassTypeId::IndexedAdvance:
             case PabloAST::ClassTypeId::ScanThru:
             case PabloAST::ClassTypeId::AdvanceThenScanThru:
             case PabloAST::ClassTypeId::ScanTo:
@@ -327,10 +340,114 @@ protected:
 
     }
 
+    explicit CarryProducingStatement(const ClassTypeId id, llvm::Type * const type, const unsigned reserved, const String * name, Allocator & allocator)
+    : Statement(id, type, reserved, name, allocator)
+    , mCarryGroup(0)
+    , mCarryWidth(0) {
+
+    }
+
+    template<typename iterator>
+    explicit CarryProducingStatement(const ClassTypeId id, llvm::Type * const type, iterator begin, iterator end, const String * name, Allocator & allocator)
+    : Statement(id, type, begin, end, name, allocator)
+    , mCarryGroup(0)
+    , mCarryWidth(0) {
+
+    }
+
 private:
 
     unsigned mCarryGroup;
     unsigned mCarryWidth;
+};
+
+
+class Variadic : public Statement {
+public:
+
+    static inline bool classof(const PabloAST * e) {
+        switch (e->getClassTypeId()) {
+            case PabloAST::ClassTypeId::And:
+            case PabloAST::ClassTypeId::Or:
+            case PabloAST::ClassTypeId::Xor:
+                return true;
+            default: return false;
+        }
+    }
+    static inline bool classof(const Variadic *) {
+        return true;
+    }
+    static inline bool classof(const void *) {
+        return false;
+    }
+
+    class iterator : public boost::iterator_facade<iterator, PabloAST *, boost::random_access_traversal_tag> {
+        friend class Variadic;
+        friend class boost::iterator_core_access;
+    protected:
+
+        iterator(PabloAST ** pointer) : mCurrent(pointer) { }
+        inline void increment() { ++mCurrent; }
+        inline void decrement() { --mCurrent; }
+        inline void advance(const std::ptrdiff_t n) { mCurrent += n; }
+        inline std::ptrdiff_t distance_to(const iterator & other) const { return other.mCurrent - mCurrent; }
+        inline PabloAST *& dereference() const { return *mCurrent; }
+
+        inline bool equal(const iterator & other) const { return (mCurrent == other.mCurrent); }
+
+    private:
+        PabloAST **        mCurrent;
+    };
+
+    using const_iterator = iterator;
+
+    void addOperand(PabloAST * const expr);
+
+    PabloAST * removeOperand(const unsigned index);
+
+    bool deleteOperand(const PabloAST * const expr);
+
+    iterator begin() {
+        return iterator(mOperand);
+    }
+
+    const_iterator begin() const {
+        return iterator(mOperand);
+    }
+
+    iterator end() {
+        return iterator(mOperand + mOperands);
+    }
+
+    const_iterator end() const {
+        return iterator(mOperand + mOperands);
+    }
+
+    virtual ~Variadic() = default;
+
+protected:
+    explicit Variadic(const ClassTypeId id, llvm::Type * const type, std::initializer_list<PabloAST *> operands, const String * const name, Allocator & allocator)
+    : Statement(id, type, operands, name, allocator)
+    , mCapacity(operands.size())
+    , mAllocator(allocator) {
+
+    }
+    explicit Variadic(const ClassTypeId id, llvm::Type * const type, const unsigned reserved, const String * name, Allocator & allocator)
+    : Statement(id, type, reserved, name, allocator)
+    , mCapacity(reserved)
+    , mAllocator(allocator) {
+
+    }
+    template<typename iterator>
+    explicit Variadic(const ClassTypeId id, llvm::Type * const type, iterator begin, iterator end, const String * name, Allocator & allocator)
+    : Statement(id, type, begin, end, name, allocator)
+    , mCapacity(std::distance(begin, end))
+    , mAllocator(allocator) {
+
+    }
+private:
+    unsigned        mCapacity;
+    Allocator &     mAllocator;
 };
 
 class StatementList {
@@ -343,11 +460,10 @@ public:
 
         iterator(Statement* base): mCurrent(base) {}
 
-        iterator(const iterator & other): mCurrent(other.mCurrent) {}
+        iterator(const iterator& other): mCurrent(other.mCurrent) {}
 
-        iterator & operator=(const iterator & other) {
-            mCurrent = other.mCurrent;
-            return *this;
+        const iterator& operator=(const iterator& other) {
+            mCurrent = other.mCurrent; return other;
         }
 
         inline iterator& operator++() {
@@ -356,17 +472,17 @@ public:
             return *this;
         }
 
-        iterator operator++(int) {
+        iterator  operator++(int) {
             iterator tmp(*this);
             ++(*this);
             return tmp;
         }
 
-        bool operator==(const iterator & other) const {
+        bool operator==(const iterator& other) const {
             return  mCurrent == other.mCurrent;
         }
 
-        bool operator!=(const iterator & other) const {
+        bool operator!=(const iterator& other) const {
             return  mCurrent != other.mCurrent;
         }
 
@@ -383,10 +499,7 @@ public:
         const_iterator(): mCurrent(nullptr) {}
         const_iterator(const Statement* base): mCurrent(base) {}
         const_iterator(const const_iterator& other): mCurrent(other.mCurrent) {}
-        const_iterator& operator=(const const_iterator & other) {
-            mCurrent = other.mCurrent;
-            return *this;
-        }
+        const const_iterator& operator=(const const_iterator& other) {mCurrent = other.mCurrent; return other;}
 
         inline const_iterator& operator++() {
             assert (mCurrent);
@@ -423,9 +536,8 @@ public:
 
         reverse_iterator(const reverse_iterator& other): mCurrent(other.mCurrent) {}
 
-        reverse_iterator & operator=(const reverse_iterator & other) {
-            mCurrent = other.mCurrent;
-            return *this;
+        const reverse_iterator& operator=(const reverse_iterator& other) {
+            mCurrent = other.mCurrent; return other;
         }
 
         inline reverse_iterator& operator++() {
@@ -460,12 +572,8 @@ public:
     public:
         const_reverse_iterator(): mCurrent(nullptr) {}
         const_reverse_iterator(const Statement* base): mCurrent(base) {}
-        const_reverse_iterator(const const_reverse_iterator & other): mCurrent(other.mCurrent) {}
-
-        const_reverse_iterator& operator=(const const_reverse_iterator & other) {
-            mCurrent = other.mCurrent;
-            return *this;
-        }
+        const_reverse_iterator(const const_reverse_iterator& other): mCurrent(other.mCurrent) {}
+        const const_reverse_iterator& operator=(const const_reverse_iterator& other) {mCurrent = other.mCurrent; return other;}
 
         inline const_reverse_iterator& operator++() {
             assert (mCurrent);
@@ -577,7 +685,7 @@ public:
         return mInsertionPoint;
     }
 
-    bool contains(const Statement * const statement) const noexcept;
+    bool contains(Statement * const statement);
 
 protected:
 
@@ -589,6 +697,19 @@ private:
     Statement   * mFirst;
     Statement   * mLast;    
 };
+
+/** ------------------------------------------------------------------------------------------------------------- *
+ * @brief deleteOperand
+ ** ------------------------------------------------------------------------------------------------------------- */
+inline bool Variadic::deleteOperand(const PabloAST * const expr) {
+    for (unsigned i = 0; i != getNumOperands(); ++i) {
+        if (LLVM_UNLIKELY(getOperand(i) == expr)) {
+            removeOperand(i);
+            return true;
+        }
+    }
+    return false;
+}
 
 }
 

@@ -1,40 +1,50 @@
 /*
- *  Copyright (c) 2018 International Characters.
+ *  Copyright (c) 2014 International Characters.
  *  This software is licensed to the public under the Open Software License 3.0.
  *  icgrep is a trademark of International Characters.
  */
 
 #include "cc_compiler.h"
-#include <cc/alphabet.h>
 #include <pablo/codegenstate.h>
 #include <pablo/boolean.h>
 #include <pablo/pe_zeroes.h>
 #include <pablo/pe_ones.h>
-#include <pablo/pe_infile.h>
 #include <pablo/builder.hpp>
 #include <pablo/pablo_kernel.h>
-#include <llvm/IR/DerivedTypes.h>
-#include <llvm/Support/ErrorHandling.h>
-#include <llvm/Support/raw_ostream.h>
 
 using namespace re;
 using namespace pablo;
 using namespace llvm;
 
 namespace cc {
-    CC_Compiler::CC_Compiler(pablo::PabloBlock * scope)
-    : mBuilder(scope) {
+
+//    CC_Compiler::CC_Compiler(PabloKernel * kernel, const unsigned encodingBits, const std::string prefix)
+//    : mBuilder(kernel->getEntryBlock())
+//    , mEncodingBits(encodingBits)
+//    , mBasisBit(encodingBits) {
+        
+//        // TODO: basisBits should be defined prior and only retrieved here.
+//        Var * const basisBits = kernel->addInput(prefix, kernel->getStreamSetTy(encodingBits));
+//        for (unsigned i = 0; i != mEncodingBits; i++) {
+//            mBasisBit[i] = mBuilder.createExtract(basisBits, mBuilder.getInteger(i)); assert (mBasisBit[i]);
+//        }
+//        mEncodingMask = (static_cast<unsigned>(1) << encodingBits) - static_cast<unsigned>(1);
+//    }
+    
+    
+    CC_Compiler::CC_Compiler(pablo::PabloKernel * kernel, pablo::Var * basisBits)
+    : mBuilder(kernel->getEntryBlock())
+    , mEncodingBits(basisBits->getType()->getArrayNumElements())
+    , mBasisBit(mEncodingBits) {
+        for (unsigned i = 0; i != mEncodingBits; i++) {
+            mBasisBit[i] = mBuilder.createExtract(basisBits, mBuilder.getInteger(i)); assert (mBasisBit[i]);
+        }
+        mEncodingMask = (static_cast<unsigned>(1) << mEncodingBits) - static_cast<unsigned>(1);
     }
     
+    
 
-Parabix_CC_Compiler::Parabix_CC_Compiler(pablo::PabloBlock * scope, std::vector<pablo::PabloAST *> basisBitSet)
-: CC_Compiler(scope)
-, mEncodingBits(basisBitSet.size())
-, mBasisBit(basisBitSet) {
-    mEncodingMask = (static_cast<unsigned>(1) << mEncodingBits) - static_cast<unsigned>(1);
-}
-
-PabloAST * Parabix_CC_Compiler::compileCC(const std::string & canonicalName, const CC *cc, PabloBlock & block) {
+PabloAST * CC_Compiler::compileCC(const std::string & canonicalName, const CC *cc, PabloBlock & block) {
     PabloAST * const var = charset_expr(cc, block);
     if (LLVM_LIKELY(isa<Statement>(var))) {
         cast<Statement>(var)->setName(block.makeName(canonicalName));
@@ -42,7 +52,7 @@ PabloAST * Parabix_CC_Compiler::compileCC(const std::string & canonicalName, con
     return var;
 }
 
-PabloAST * Parabix_CC_Compiler::compileCC(const std::string & canonicalName, const CC *cc, PabloBuilder & builder) {
+PabloAST * CC_Compiler::compileCC(const std::string & canonicalName, const CC *cc, PabloBuilder & builder) {
     PabloAST * const var = charset_expr(cc, builder);
     if (LLVM_LIKELY(isa<Statement>(var))) {
         cast<Statement>(var)->setName(builder.makeName(canonicalName));
@@ -51,7 +61,7 @@ PabloAST * Parabix_CC_Compiler::compileCC(const std::string & canonicalName, con
 }
     
 template<typename PabloBlockOrBuilder>
-PabloAST * Parabix_CC_Compiler::charset_expr(const CC * cc, PabloBlockOrBuilder & pb) {
+PabloAST * CC_Compiler::charset_expr(const CC * cc, PabloBlockOrBuilder & pb) {
     if (cc->empty()) {
         return pb.createZeroes();
     }
@@ -90,12 +100,12 @@ PabloAST * Parabix_CC_Compiler::charset_expr(const CC * cc, PabloBlockOrBuilder 
         PabloAST * temp = char_or_range_expr(lo_codepoint(i), hi_codepoint(i), pb);
         expr = (expr == nullptr) ? temp : pb.createOr(expr, temp);
     }
-    return pb.createInFile(expr);
+    return expr;
     
 }
 
 template<typename PabloBlockOrBuilder>
-PabloAST * Parabix_CC_Compiler::bit_pattern_expr(const unsigned pattern, unsigned selected_bits, PabloBlockOrBuilder & pb) {
+PabloAST * CC_Compiler::bit_pattern_expr(const unsigned pattern, unsigned selected_bits, PabloBlockOrBuilder & pb) {
     if (LLVM_UNLIKELY(selected_bits == 0)) {
         return pb.createOnes();
     } else {
@@ -134,20 +144,19 @@ PabloAST * Parabix_CC_Compiler::bit_pattern_expr(const unsigned pattern, unsigne
 }
 
 template<typename PabloBlockOrBuilder>
-inline PabloAST * Parabix_CC_Compiler::char_test_expr(const codepoint_t ch, PabloBlockOrBuilder &pb) {
+inline PabloAST * CC_Compiler::char_test_expr(const codepoint_t ch, PabloBlockOrBuilder &pb) {
     return bit_pattern_expr(ch, mEncodingMask, pb);
 }
 
 template<typename PabloBlockOrBuilder>
-PabloAST * Parabix_CC_Compiler::make_range(const codepoint_t n1, const codepoint_t n2, PabloBlockOrBuilder & pb) {
+PabloAST * CC_Compiler::make_range(const codepoint_t n1, const codepoint_t n2, PabloBlockOrBuilder & pb) {
     codepoint_t diff_count = 0;
 
     for (codepoint_t diff_bits = n1 ^ n2; diff_bits; diff_count++, diff_bits >>= 1);
 
-    if ((n2 < n1) || (diff_count > mEncodingBits)) {
-        llvm::report_fatal_error("Bad Range: [" + std::to_string(n1) + "," +
-                                 std::to_string(n2) + "] for " +
-                                 std::to_string(mEncodingBits) + "-bit encoding");
+    if ((n2 < n1) || (diff_count > mEncodingBits))
+    {
+        throw std::runtime_error("Bad Range: [" + std::to_string(n1) + "," + std::to_string(n2) + "]");
     }
 
     const codepoint_t mask0 = (static_cast<codepoint_t>(1) << diff_count) - 1;
@@ -165,7 +174,7 @@ PabloAST * Parabix_CC_Compiler::make_range(const codepoint_t n1, const codepoint
 }
 
 template<typename PabloBlockOrBuilder>
-PabloAST * Parabix_CC_Compiler::GE_Range(const unsigned N, const unsigned n, PabloBlockOrBuilder &pb) {
+PabloAST * CC_Compiler::GE_Range(const unsigned N, const unsigned n, PabloBlockOrBuilder &pb) {
     if (N == 0) {
         return pb.createOnes(); //Return a true literal.
     }
@@ -202,7 +211,7 @@ PabloAST * Parabix_CC_Compiler::GE_Range(const unsigned N, const unsigned n, Pab
 }
 
 template<typename PabloBlockOrBuilder>
-PabloAST * Parabix_CC_Compiler::LE_Range(const unsigned N, const unsigned n, PabloBlockOrBuilder & pb) {
+PabloAST * CC_Compiler::LE_Range(const unsigned N, const unsigned n, PabloBlockOrBuilder & pb) {
     /*
       If an N-bit pattern is all ones, then it is always true that any n-bit value is LE this pattern.
       Handling this as a special case avoids an overflow issue with n+1 requiring more than N bits.
@@ -215,83 +224,20 @@ PabloAST * Parabix_CC_Compiler::LE_Range(const unsigned N, const unsigned n, Pab
 }
 
 template<typename PabloBlockOrBuilder>
-inline PabloAST * Parabix_CC_Compiler::char_or_range_expr(const codepoint_t lo, const codepoint_t hi, PabloBlockOrBuilder &pb) {
+inline PabloAST * CC_Compiler::char_or_range_expr(const codepoint_t lo, const codepoint_t hi, PabloBlockOrBuilder &pb) {
     if (lo == hi) {
         return char_test_expr(lo, pb);
     } else if (lo < hi) {
         return make_range(lo, hi, pb);
     }
-    llvm::report_fatal_error(std::string("Invalid Character Set Range: [") + std::to_string(lo) + "," + std::to_string(hi) + "]");
+    throw std::runtime_error(std::string("Invalid Character Set Range: [") + std::to_string(lo) + "," + std::to_string(hi) + "]");
 }
 
-inline PabloAST * Parabix_CC_Compiler::getBasisVar(const unsigned i) const {
+inline PabloAST * CC_Compiler::getBasisVar(const unsigned i) const {
     assert (i < mEncodingBits);
     const unsigned index = mEncodingBits - i - 1; assert (index < mEncodingBits);
     assert (mBasisBit[index]);
     return mBasisBit[index];
-}
-
-    
-PabloAST * compileCCfromCodeUnitStream(const CC * cc, PabloAST * codeUnitStream, PabloBuilder & pb) {
-    const Alphabet * a = cc->getAlphabet();
-    if (!isa<CodeUnitAlphabet>(a)) {
-        llvm::report_fatal_error("compileCCfromCodeUnitStream must be applied to a CC with a CodeUnitAlphabet");
-    }
-    unsigned codeUnitWidth = cast<const CodeUnitAlphabet>(a)->getCodeUnitBitWidth();
-    unsigned topBit = 1 << (codeUnitWidth - 1);
-    unsigned maxCodeVal = (topBit - 1) | topBit;
-    //
-    // Optimization if there are isolated codepoints that are not in the set.
-    UCD::UnicodeSet negatedIsolates = (~(*cc)).isolates();
-    UCD::UnicodeSet withNegatedIsolates = (*cc + negatedIsolates);
-    PabloAST * ccStrm = pb.createZeroes();
-    for (const auto & interval : withNegatedIsolates) {
-        unsigned lo = re::lo_codepoint(interval);
-        unsigned hi = re::hi_codepoint(interval);
-        if (lo == hi) {
-            PabloAST * testVal = pb.createRepeat(codeUnitWidth, lo);
-            ccStrm = pb.createOr(ccStrm, pb.createEquals(codeUnitStream, testVal));
-        } else if (lo == 0) {
-            if (hi == maxCodeVal) {
-                // All code units
-                ccStrm = pb.createOnes();
-            } else {
-                PabloAST * testVal = pb.createRepeat(codeUnitWidth, hi+1);
-                ccStrm = pb.createOr(ccStrm, pb.createLessThan(codeUnitStream, testVal));
-            }
-        } else if (hi == maxCodeVal) {
-            PabloAST * testVal = pb.createRepeat(codeUnitWidth, lo);
-            ccStrm = pb.createOr(ccStrm, pb.createNot(pb.createLessThan(codeUnitStream, testVal)));
-        } else {
-            PabloAST * testVal_lo = pb.createRepeat(codeUnitWidth, lo);
-            PabloAST * testVal_hi = pb.createRepeat(codeUnitWidth, hi + 1);
-            ccStrm = pb.createOr(ccStrm, pb.createAnd(pb.createNot(pb.createLessThan(codeUnitStream, testVal_lo)),
-                                                      pb.createLessThan(codeUnitStream, testVal_hi)));
-        }
-    }
-    if (!negatedIsolates.empty()) {
-        PabloAST * toExclude = pb.createZeroes();
-        for (const auto & interval : negatedIsolates) {
-            PabloAST * testVal = pb.createRepeat(codeUnitWidth, re::lo_codepoint(interval));
-            toExclude = pb.createOr(toExclude, pb.createEquals(codeUnitStream, testVal));
-        }
-        ccStrm = pb.createAnd(ccStrm, pb.createNot(toExclude));
-    }
-    return pb.createInFile(ccStrm);
-}
-    
-Direct_CC_Compiler::Direct_CC_Compiler(pablo::PabloBlock * scope, pablo::PabloAST * codeUnitStream)
-: CC_Compiler(scope)
-, mCodeUnitStream(codeUnitStream) {
-}
-
-pablo::PabloAST * Direct_CC_Compiler::compileCC(const std::string & name, const re::CC *cc, pablo::PabloBlock & block) {
-    PabloBuilder pb(&block);
-    return compileCC(name, cc, pb);
-}
-
-pablo::PabloAST * Direct_CC_Compiler::compileCC(const std::string & name, const re::CC *cc, pablo::PabloBuilder & b) {
-    return compileCCfromCodeUnitStream(cc, mCodeUnitStream, b);
 }
 
 } // end of namespace cc

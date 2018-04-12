@@ -21,9 +21,6 @@
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/ToolOutputFile.h>
 #include <llvm/Target/TargetMachine.h>
-#if LLVM_VERSION_INTEGER >= LLVM_VERSION_CODE(3, 9, 0)
-#include <llvm/Transforms/Scalar/GVN.h>
-#endif
 
 using namespace llvm;
 
@@ -42,12 +39,8 @@ NVPTXDriver::NVPTXDriver(std::string && moduleName)
     initializeCodeGen(*Registry);
     initializeLoopStrengthReducePass(*Registry);
     initializeLowerIntrinsicsPass(*Registry);
-#if LLVM_VERSION_INTEGER < LLVM_VERSION_CODE(3, 9, 0)
     initializeUnreachableBlockElimPass(*Registry);
-#else
-    initializeUnreachableBlockElimLegacyPassPass(*Registry);
-#endif
-    
+
     mMainModule->setDataLayout("e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v16:16:16-v32:32:32-v64:64:64-v128:128:128-n16:32:64");
     mMainModule->setTargetTriple("nvptx64-nvidia-cuda");
 
@@ -60,10 +53,24 @@ void NVPTXDriver::makeKernelCall(kernel::Kernel * kb, const std::vector<parabix:
     assert ("addKernelCall or makeKernelCall was already run on this kernel." && (kb->getModule() == nullptr));
     mPipeline.emplace_back(kb);
     kb->bindPorts(inputs, outputs);
-    kb->setModule(mMainModule);
+    kb->setModule(iBuilder, mMainModule);
 }
 
 void NVPTXDriver::generatePipelineIR() {
+    #ifndef NDEBUG
+    if (LLVM_UNLIKELY(mPipeline.empty())) {
+        report_fatal_error("Pipeline cannot be empty");
+    } else {
+        for (auto i = mPipeline.begin(); i != mPipeline.end(); ++i) {
+            for (auto j = i; ++j != mPipeline.end(); ) {
+                if (LLVM_UNLIKELY(*i == *j)) {
+                    report_fatal_error("Kernel instances cannot occur twice in the pipeline");
+                }
+            }
+        }
+    }
+    #endif
+
     // note: instantiation of all kernels must occur prior to initialization
     for (const auto & k : mPipeline) {
         k->addKernelDeclarations(iBuilder);
@@ -142,6 +149,36 @@ static int llvm2ptx(Module * M, std::string PTXFilename) {
         AnalysisID StartAfterID = nullptr;
         AnalysisID StopAfterID = nullptr;
         const PassRegistry *PR = PassRegistry::getPassRegistry();
+        if (!codegen::RunPass.empty()) {
+            if (!codegen::StartAfter.empty() || !codegen::StopAfter.empty()) {
+                errs() << "start-after and/or stop-after passes are redundant when run-pass is specified.\n";
+                return 1;
+            }
+            const PassInfo *PI = PR->getPassInfo(codegen::RunPass);
+            if (!PI) {
+                errs() << "run-pass pass is not registered.\n";
+                return 1;
+            }
+            StopAfterID = StartBeforeID = PI->getTypeInfo();
+        } else {
+            if (!codegen::StartAfter.empty()) {
+                const PassInfo *PI = PR->getPassInfo(codegen::StartAfter);
+                if (!PI) {
+                    errs() << "start-after pass is not registered.\n";
+                    return 1;
+                }
+                StartAfterID = PI->getTypeInfo();
+            }
+            if (!codegen::StopAfter.empty()) {
+                const PassInfo *PI = PR->getPassInfo(codegen::StopAfter);
+                if (!PI) {
+                    errs() << "stop-after pass is not registered.\n";
+                    return 1;
+                }
+                StopAfterID = PI->getTypeInfo();
+            }
+        }
+
         // Ask the target to add backend passes as necessary.
         if (Target->addPassesToEmitFile(PM, *OS, codegen::FileType, false, StartBeforeID,
                                         StartAfterID, StopAfterID, MIR.get())) {
@@ -182,7 +219,7 @@ void NVPTXDriver::finalizeObject() {
 
     PM.run(*mMainModule);  
 
-    if (LLVM_UNLIKELY(codegen::ShowIROption != "")) {
+    if (LLVM_UNLIKELY(codegen::DebugOptionIsSet(codegen::ShowIR))) {
         mMainModule->dump();
     }
 

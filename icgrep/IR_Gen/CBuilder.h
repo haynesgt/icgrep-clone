@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2017 International Characters.
+ *  Copyright (c) 2016 International Characters.
  *  This software is licensed to the public under the Open Software License 3.0.
  */
 #ifndef CBUILDER_H
@@ -59,62 +59,26 @@ public:
     // Round up to a multiple of divisor.
     llvm::Value * CreateRoundUp(llvm::Value * number, llvm::Value * divisor, const llvm::Twine &Name = "");
             
-    // Get minimum of two unsigned numbers
-    llvm::Value * CreateUMin(llvm::Value * const a, llvm::Value * const b) {
-        if (a == nullptr) return b;
-        if (b == nullptr) return a;
-        assert (a->getType() == b->getType());
-        return CreateSelect(CreateICmpULT(a, b), a, b);
-    }
+    llvm::Value * CreateMalloc(llvm::Value * size);
 
-    // Get minimum of two signed numbers
-    llvm::Value * CreateSMin(llvm::Value * const a, llvm::Value * const b) {
-        if (a == nullptr) return b;
-        if (b == nullptr) return a;
-        assert (a->getType() == b->getType());
-        return CreateSelect(CreateICmpSLT(a, b), a, b);
-    }
-
-    // Get maximum of two unsigned numbers
-    llvm::Value * CreateUMax(llvm::Value * const a, llvm::Value * const b) {
-        if (a == nullptr) return b;
-        if (b == nullptr) return a;
-        assert (a->getType() == b->getType());
-        return CreateSelect(CreateICmpUGT(a, b), a, b);
-    }
-
-    // Get maximum of two signed numbers
-    llvm::Value * CreateSMax(llvm::Value * const a, llvm::Value * const b) {
-        if (a == nullptr) return b;
-        if (b == nullptr) return a;
-        assert (a->getType() == b->getType());
-        return CreateSelect(CreateICmpSGT(a, b), a, b);
-    }
-
-    llvm::Value * CreateMalloc(llvm::Value * const size);
-
-    llvm::Value * CreateAlignedMalloc(llvm::Value * const size, const unsigned alignment);
-
-    llvm::Value * CreateCacheAlignedMalloc(llvm::Value * const size) {
-        return CreateAlignedMalloc(size, getCacheAlignment());
-    }
+    llvm::Value * CreateAlignedMalloc(llvm::Value * size, const unsigned alignment);
     
     void CreateFree(llvm::Value * const ptr);
 
-    llvm::Value * CreateRealloc(llvm::Value * const ptr, llvm::Value * const size);
+    llvm::Value * CreateRealloc(llvm::Value * ptr, llvm::Value * size);
 
-    llvm::CallInst * CreateMemZero(llvm::Value * const ptr, llvm::Value * const size, const unsigned alignment = 1) {
+    llvm::CallInst * CreateMemZero(llvm::Value * ptr, llvm::Value * size, const unsigned alignment = 1) {
         return CreateMemSet(ptr, getInt8(0), size, alignment);
     }
 
-    llvm::AllocaInst * CreateAlignedAlloca(llvm::Type * const Ty, const unsigned alignment, llvm::Value * const ArraySize = nullptr) {
+    llvm::AllocaInst * CreateCacheAlignedAlloca(llvm::Type * Ty, llvm::Value * ArraySize = nullptr) {
         llvm::AllocaInst * instr = CreateAlloca(Ty, ArraySize);
-        instr->setAlignment(alignment);
+        instr->setAlignment(getCacheAlignment());
         return instr;
     }
 
-    llvm::AllocaInst * CreateCacheAlignedAlloca(llvm::Type * const Ty, llvm::Value * const ArraySize = nullptr) {
-        return CreateAlignedAlloca(Ty, getCacheAlignment(), ArraySize);
+    llvm::Value * CreateCacheAlignedMalloc(llvm::Value * size) {
+        return CreateAlignedMalloc(size, getCacheAlignment());
     }
 
     // stdio.h functions
@@ -180,15 +144,6 @@ public:
 
     llvm::Value * CreateMUnmap(llvm::Value * addr, llvm::Value * size);
 
-    enum Protect {
-        NONE = 0
-        , READ = 1
-        , WRITE = 2
-        , EXEC = 4
-    };
-
-    llvm::Value * CreateMProtect(llvm::Value * addr, llvm::Value * size, int protect);
-
     //  Posix thread (pthread.h) functions.
     //
     //  Create a call to:  int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
@@ -209,7 +164,7 @@ public:
     void CallPrintIntToStderr(const std::string & name, llvm::Value * const value);
     
     llvm::Value * GetString(llvm::StringRef Str);
-
+    
     void CallPrintMsgToStderr(const std::string & message);
 
     inline llvm::IntegerType * getSizeTy() const {
@@ -221,11 +176,9 @@ public:
         return llvm::ConstantInt::get(getSizeTy(), value);
     }
     
-    llvm::IntegerType * LLVM_READNONE getIntAddrTy() const;
-    
-    llvm::PointerType * LLVM_READNONE getVoidPtrTy(const unsigned AddressSpace = 0) const;
-    
-    llvm::PointerType * LLVM_READNONE getFILEptrTy();
+    llvm::PointerType * getVoidPtrTy() const;
+
+    llvm::PointerType * getFILEptrTy();
     
     inline unsigned getCacheAlignment() const {
         return mCacheLineAlignment;
@@ -235,14 +188,14 @@ public:
 
     virtual llvm::StoreInst *  CreateAtomicStoreRelease(llvm::Value * val, llvm::Value * ptr);
 
-    void CreateAssert(llvm::Value * assertion, const llvm::Twine & failureMessage) {
+    void CreateAssert(llvm::Value * assertion, llvm::StringRef failureMessage) {
         if (LLVM_UNLIKELY(assertion->getType()->isVectorTy())) {
             assertion = CreateBitCast(assertion, getIntNTy(assertion->getType()->getPrimitiveSizeInBits()));
         }
         return __CreateAssert(CreateIsNotNull(assertion), failureMessage);
     }
 
-    void CreateAssertZero(llvm::Value * assertion, const llvm::Twine & failureMessage) {
+    void CreateAssertZero(llvm::Value * assertion, llvm::StringRef failureMessage) {
         if (LLVM_UNLIKELY(assertion->getType()->isVectorTy())) {
             assertion = CreateBitCast(assertion, getIntNTy(assertion->getType()->getPrimitiveSizeInBits()));
         }
@@ -257,15 +210,17 @@ public:
         return CreateLikelyCondBr(Cond, True, False, 100 - probability);
     }
 
-    llvm::BasicBlock * CreateBasicBlock(const llvm::StringRef name = "", llvm::BasicBlock * insertBefore = nullptr);
+    llvm::BasicBlock * CreateBasicBlock(std::string && name);
 
-    virtual bool supportsIndirectBr() const;
+    virtual bool supportsIndirectBr() const {
+        return true;
+    }
 
     llvm::Value * CreatePopcount(llvm::Value * bits);
 
-    // TODO: AVX512 offers these as vector instructions
-    llvm::Value * CreateCountForwardZeroes(llvm::Value * value, const bool guaranteedNonZero = false);
-    llvm::Value * CreateCountReverseZeroes(llvm::Value * value, const bool guaranteedNonZero = false);
+    llvm::Value * CreateCountForwardZeroes(llvm::Value * value);
+
+    llvm::Value * CreateCountReverseZeroes(llvm::Value * value);
     
     // Useful bit manipulation operations  
     llvm::Value * CreateResetLowestBit(llvm::Value * bits);   
@@ -285,6 +240,7 @@ public:
     template <typename ExternalFunctionType>
     llvm::Function * LinkFunction(llvm::StringRef name, ExternalFunctionType * functionPtr) const;
 
+    #ifdef HAS_ADDRESS_SANITIZER
     virtual llvm::LoadInst * CreateLoad(llvm::Value * Ptr, const char * Name);
 
     virtual llvm::LoadInst * CreateLoad(llvm::Value * Ptr, const llvm::Twine & Name = "");
@@ -294,6 +250,7 @@ public:
     virtual llvm::LoadInst * CreateLoad(llvm::Value * Ptr, bool isVolatile, const llvm::Twine & Name = "");
 
     virtual llvm::StoreInst * CreateStore(llvm::Value * Val, llvm::Value * Ptr, bool isVolatile = false);
+    #endif
 
     llvm::LoadInst * CreateAlignedLoad(llvm::Value * Ptr, unsigned Align, const char * Name);
 
@@ -302,44 +259,6 @@ public:
     llvm::LoadInst * CreateAlignedLoad(llvm::Value * Ptr, unsigned Align, bool isVolatile, const llvm::Twine & Name = "");
 
     llvm::StoreInst * CreateAlignedStore(llvm::Value * Val, llvm::Value * Ptr, unsigned Align, bool isVolatile = false);
-
-    llvm::CallInst * CreateMemMove(llvm::Value *Dst, llvm::Value *Src, uint64_t Size, unsigned Align,
-                            bool isVolatile = false, llvm::MDNode *TBAATag = nullptr,
-                            llvm::MDNode *ScopeTag = nullptr,
-                            llvm::MDNode *NoAliasTag = nullptr) {
-        return CreateMemMove(Dst, Src, getInt64(Size), Align, isVolatile, TBAATag, ScopeTag, NoAliasTag);
-    }
-
-    llvm::CallInst * CreateMemMove(llvm::Value *Dst, llvm::Value *Src, llvm::Value *Size, unsigned Align,
-                            bool isVolatile = false, llvm::MDNode *TBAATag = nullptr,
-                            llvm::MDNode *ScopeTag = nullptr,
-                            llvm::MDNode *NoAliasTag = nullptr);
-
-    llvm::CallInst * CreateMemCpy(llvm::Value *Dst, llvm::Value *Src, uint64_t Size, unsigned Align,
-                           bool isVolatile = false, llvm::MDNode *TBAATag = nullptr,
-                           llvm::MDNode *TBAAStructTag = nullptr,
-                           llvm::MDNode *ScopeTag = nullptr,
-                           llvm::MDNode *NoAliasTag = nullptr) {
-        return CreateMemCpy(Dst, Src, getInt64(Size), Align, isVolatile, TBAATag, TBAAStructTag, ScopeTag, NoAliasTag);
-    }
-
-    llvm::CallInst * CreateMemCpy(llvm::Value *Dst, llvm::Value *Src, llvm::Value *Size, unsigned Align,
-                           bool isVolatile = false, llvm::MDNode *TBAATag = nullptr,
-                           llvm::MDNode *TBAAStructTag = nullptr,
-                           llvm::MDNode *ScopeTag = nullptr,
-                           llvm::MDNode *NoAliasTag = nullptr);
-
-    llvm::CallInst * CreateMemSet(llvm::Value *Ptr, llvm::Value *Val, uint64_t Size, unsigned Align,
-                           bool isVolatile = false, llvm::MDNode *TBAATag = nullptr,
-                           llvm::MDNode *ScopeTag = nullptr,
-                           llvm::MDNode *NoAliasTag = nullptr) {
-        return CreateMemSet(Ptr, Val, getInt64(Size), Align, isVolatile, TBAATag, ScopeTag, NoAliasTag);
-    }
-
-    llvm::CallInst * CreateMemSet(llvm::Value *Ptr, llvm::Value *Val, llvm::Value *Size, unsigned Align,
-                           bool isVolatile = false, llvm::MDNode *TBAATag = nullptr,
-                           llvm::MDNode *ScopeTag = nullptr,
-                           llvm::MDNode *NoAliasTag = nullptr);
 
     void setDriver(Driver * const driver) {
         mDriver = driver;
@@ -353,7 +272,7 @@ protected:
 
     bool hasAddressSanitizer() const;
 
-    void __CreateAssert(llvm::Value * assertion, const llvm::Twine & failureMessage);
+    void __CreateAssert(llvm::Value * assertion, llvm::StringRef failureMessage);
 
     llvm::Function * LinkFunction(llvm::StringRef name, llvm::FunctionType * type, void * functionPtr) const;
 

@@ -7,12 +7,25 @@
 #ifndef RE_REVERSE_H
 #define RE_REVERSE_H
 
-namespace re { class RE; }
+//#include <map>                           // for map
+namespace re { class RE; class Name;}
 
 namespace re {
     
-RE * reverse(RE * re);
-
+/*
+class Reverser (
+public:
+    Reverser();
+    */
+    RE * reverse(RE * re);
+    /*
+private:
+    using NameMap = std::map<std::pair<std::string, std::string>, re::Name *>;
+    unsigned                    mCaptureGroupCount;
+    NameMap                     mNameMap;
+    Memoizer                    mMemoizer;
+}
+*/
 }
 
 #endif // RE_REVERSE_H

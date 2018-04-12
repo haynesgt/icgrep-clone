@@ -38,7 +38,7 @@ namespace kernel {
 // relying on the MultiBlockKernel builder to only copy the correct number
 // of bytes to the actual output stream.
 
-void expand3_4Kernel::generateMultiBlockLogic(const std::unique_ptr<KernelBuilder> &iBuilder, Value * const numOfStrides) {
+void expand3_4Kernel::generateMultiBlockLogic(const std::unique_ptr<KernelBuilder> & iBuilder) {
 
     BasicBlock * expand2_3entry = iBuilder->GetInsertBlock();
     BasicBlock * expand_3_4_loop = iBuilder->CreateBasicBlock("expand_3_4_loop");
@@ -70,19 +70,23 @@ void expand3_4Kernel::generateMultiBlockLogic(const std::unique_ptr<KernelBuilde
     
     const unsigned packAlign = iBuilder->getBitBlockWidth()/8;
 
-    Value * itemsToDo = mAvailableItemCount[0];
-
-    Value * sourceStream = iBuilder->getInputStreamBlockPtr("sourceStream", iBuilder->getInt32(0));
-    Value * expandedStream = iBuilder->getOutputStreamBlockPtr("expand34Stream", iBuilder->getInt32(0));
+    Function::arg_iterator args = mCurrentMethod->arg_begin();
+    
+    /* self = */ args++;
+    Value * itemsToDo = &*(args++);
+    Value * sourceStream = &*(args++);
+    Value * expandedStream = &*(args);
 
     // The main loop processes 3 packs of data at a time.
     // The initial pack offsets may be nonzero.
-    sourceStream = iBuilder->CreatePointerCast(sourceStream, iBuilder->getInt8PtrTy());
-    expandedStream = iBuilder->CreatePointerCast(expandedStream, iBuilder->getInt8PtrTy());
+    
+    Value * sourcePackPtr = iBuilder->CreateBitCast(sourceStream, iBuilder->getBitBlockType()->getPointerTo());
     Value * offset = iBuilder->CreateURem(iBuilder->getProcessedItemCount("sourceStream"), iBuilder->getSize(iBuilder->getBitBlockWidth()));
-    Value * sourcePackPtr = iBuilder->CreatePointerCast(iBuilder->CreateGEP(sourceStream, offset), iBuilder->getBitBlockType()->getPointerTo());
+    sourcePackPtr = iBuilder->CreateGEP(sourcePackPtr, iBuilder->CreateUDiv(offset, iBuilder->getSize(PACK_SIZE)));
+    Value * outputPackPtr = iBuilder->CreateBitCast(expandedStream, iBuilder->getBitBlockType()->getPointerTo());
     offset = iBuilder->CreateURem(iBuilder->getProducedItemCount("expand34Stream"), iBuilder->getSize(iBuilder->getBitBlockWidth()));
-    Value * outputPackPtr = iBuilder->CreatePointerCast(iBuilder->CreateGEP(expandedStream, offset), iBuilder->getBitBlockType()->getPointerTo());
+    outputPackPtr = iBuilder->CreateGEP(outputPackPtr, iBuilder->CreateUDiv(offset, iBuilder->getSize(PACK_SIZE)));
+
     iBuilder->CreateCondBr(iBuilder->CreateICmpSGT(itemsToDo, iBuilder->getSize(0)), expand_3_4_loop, expand3_4_exit);
     
     iBuilder->SetInsertPoint(expand_3_4_loop);
@@ -129,8 +133,7 @@ void expand3_4Kernel::generateMultiBlockLogic(const std::unique_ptr<KernelBuilde
     iBuilder->CreateCondBr(continueLoop, expand_3_4_loop, expand3_4_exit);
     
     iBuilder->SetInsertPoint(expand3_4_exit);
-
-}
+    }
 
 
 // Radix 64 determination, converting 3 bytes to 4 6-bit values.
@@ -292,10 +295,10 @@ void base64Kernel::generateFinalBlockMethod(const std::unique_ptr<KernelBuilder>
 
 expand3_4Kernel::expand3_4Kernel(const std::unique_ptr<kernel::KernelBuilder> & iBuilder)
 : MultiBlockKernel("expand3_4",
-            {Binding{iBuilder->getStreamSetTy(1, 8), "sourceStream", FixedRate(3)}},
-            {Binding{iBuilder->getStreamSetTy(1, 8), "expand34Stream", FixedRate(4)}},
+            {Binding{iBuilder->getStreamSetTy(1, 8), "sourceStream"}},
+            {Binding{iBuilder->getStreamSetTy(1, 8), "expand34Stream", FixedRatio(4,3)}},
             {}, {}, {}) {
-
+    setKernelStride(3 * iBuilder->getBitBlockWidth()/8);
 }
 
 radix64Kernel::radix64Kernel(const std::unique_ptr<kernel::KernelBuilder> & iBuilder)
@@ -308,7 +311,7 @@ radix64Kernel::radix64Kernel(const std::unique_ptr<kernel::KernelBuilder> & iBui
 base64Kernel::base64Kernel(const std::unique_ptr<kernel::KernelBuilder> & iBuilder)
 : BlockOrientedKernel("base64",
             {Binding{iBuilder->getStreamSetTy(1, 8), "radix64stream"}},
-            {Binding{iBuilder->getStreamSetTy(1, 8), "base64stream", FixedRate(1), RoundUpTo(4)}},
+            {Binding{iBuilder->getStreamSetTy(1, 8), "base64stream", RoundUpToMultiple(4)}},
             {}, {}, {}) {
 }
 

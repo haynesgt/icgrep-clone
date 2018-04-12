@@ -15,28 +15,6 @@ namespace llvm { class Value; }
 
 namespace IDISA {
 
-    
-inline bool isStreamTy(llvm::Type * t) {
-    return t->isVectorTy() && (t->getVectorNumElements() == 0);
-}
-
-inline bool isStreamSetTy(llvm::Type * t) {
-    return t->isArrayTy() && (isStreamTy(t->getArrayElementType()));
-}
-
-inline unsigned getNumOfStreams (llvm::Type * t) {
-    if (isStreamTy(t)) return 1;
-    assert(isStreamSetTy(t));
-    return t->getArrayNumElements();
-}
-
-inline unsigned getStreamFieldWidth (llvm::Type * t) {
-    if (isStreamTy(t)) return t->getScalarSizeInBits();
-    assert(isStreamSetTy(t));
-    return t->getArrayElementType()->getScalarSizeInBits();
-}
-
-    
 class IDISA_Builder : public CBuilder {
 
 public:
@@ -119,20 +97,9 @@ public:
     virtual llvm::Value * simd_slli(unsigned fw, llvm::Value * a, unsigned shift);
     virtual llvm::Value * simd_srli(unsigned fw, llvm::Value * a, unsigned shift);
     virtual llvm::Value * simd_srai(unsigned fw, llvm::Value * a, unsigned shift);
-    virtual llvm::Value * simd_sllv(unsigned fw, llvm::Value * a, llvm::Value * shifts);
-    virtual llvm::Value * simd_srlv(unsigned fw, llvm::Value * a, llvm::Value * shifts);
     
-    virtual llvm::Value * simd_pext(unsigned fw, llvm::Value * v, llvm::Value * extract_mask);
-    virtual llvm::Value * simd_pdep(unsigned fw, llvm::Value * v, llvm::Value * deposit_mask);
-    
-    llvm::Value * simd_popcount(unsigned fw, llvm::Value * a) {
-        if (LLVM_UNLIKELY(fw < 8)) {
-            assert ("field width is less than 8" && false);
-            llvm::report_fatal_error("Unsupported field width: popcount " + std::to_string(fw));
-        }
-        return CreatePopcount(fwCast(fw, a));
-    }
-
+    virtual llvm::Value * simd_cttz(unsigned fw, llvm::Value * a);
+    virtual llvm::Value * simd_popcount(unsigned fw, llvm::Value * a);
     virtual llvm::Value * simd_bitreverse(unsigned fw, llvm::Value * a);
     
     virtual llvm::Value * esimd_mergeh(unsigned fw, llvm::Value * a, llvm::Value * b);
@@ -148,9 +115,6 @@ public:
     
     virtual llvm::Value * mvmd_extract(unsigned fw, llvm::Value * a, unsigned fieldIndex);
     virtual llvm::Value * mvmd_insert(unsigned fw, llvm::Value * blk, llvm::Value * elt, unsigned fieldIndex);
-
-    virtual llvm::Value * mvmd_sll(unsigned fw, llvm::Value * value, llvm::Value * shift);
-    virtual llvm::Value * mvmd_srl(unsigned fw, llvm::Value * value, llvm::Value * shift);
     virtual llvm::Value * mvmd_slli(unsigned fw, llvm::Value * a, unsigned shift);
     virtual llvm::Value * mvmd_srli(unsigned fw, llvm::Value * a, unsigned shift);
     virtual llvm::Value * mvmd_dslli(unsigned fw, llvm::Value * a, llvm::Value * b, unsigned shift);
@@ -161,7 +125,6 @@ public:
     virtual std::pair<llvm::Value *, llvm::Value *> bitblock_add_with_carry(llvm::Value * a, llvm::Value * b, llvm::Value * carryin);
     // full shift producing {shiftout, shifted}
     virtual std::pair<llvm::Value *, llvm::Value *> bitblock_advance(llvm::Value * a, llvm::Value * shiftin, unsigned shift);
-    virtual std::pair<llvm::Value *, llvm::Value *> bitblock_indexed_advance(llvm::Value * a, llvm::Value * index_strm, llvm::Value * shiftin, unsigned shift);
     virtual llvm::Value * bitblock_mask_from(llvm::Value * pos);
     virtual llvm::Value * bitblock_set_bit(llvm::Value * pos);
 
@@ -192,7 +155,7 @@ public:
     llvm::ArrayType * getStreamSetTy(const unsigned NumElements = 1, const unsigned FieldWidth = 1) {
         return getStreamSetTy(getContext(), NumElements, FieldWidth);
     }
-    
+
     void CallPrintRegister(const std::string & regName, llvm::Value * const value);
 
 protected:

@@ -10,39 +10,40 @@
 namespace pablo {
 
 class CarryData {
+    friend class CarryManager;
 public:
 
-    enum SummaryType : unsigned {
-        NoSummary = 0
-        , ImplicitSummary = 1
-        , BorrowedSummary = 2
-        , ExplicitSummary = 3
-        , NonCarryCollapsingMode = 4
+    enum SummaryType : int {
+        NoSummary
+        , ImplicitSummary
+        , BorrowedSummary
+        , ExplicitSummary
     };
 
     CarryData()
-    : mSummaryType(NoSummary) {
+    : mSummaryType(NoSummary)
+    , mInNonCollapsingCarryMode(false) {
 
     }
              
     bool hasSummary() const {
-        return (mSummaryType & (ImplicitSummary | BorrowedSummary | ExplicitSummary)) != NoSummary;
+        return (mSummaryType != NoSummary);
     }
     
     bool hasImplicitSummary() const {
-        return (mSummaryType & (ImplicitSummary | BorrowedSummary | ExplicitSummary)) == ImplicitSummary;
+        return (mSummaryType == ImplicitSummary);
     }
 
     bool hasBorrowedSummary() const {
-        return (mSummaryType & (ImplicitSummary | BorrowedSummary | ExplicitSummary)) == BorrowedSummary;
+        return (mSummaryType == BorrowedSummary);
     }
 
     bool hasExplicitSummary() const {
-        return (mSummaryType & (ImplicitSummary | BorrowedSummary | ExplicitSummary)) == ExplicitSummary;
+        return (mSummaryType == ExplicitSummary);
     }
 
     bool nonCarryCollapsingMode() const {
-        return (mSummaryType & (NonCarryCollapsingMode)) != 0;
+        return mInNonCollapsingCarryMode;
     }
 
     void setSummaryType(const SummaryType value) {
@@ -50,16 +51,13 @@ public:
     }
 
     void setNonCollapsingCarryMode(const bool value = true) {
-        if (value) {
-            mSummaryType = (SummaryType)(mSummaryType | NonCarryCollapsingMode);
-        } else {
-            mSummaryType = (SummaryType)(mSummaryType & ~NonCarryCollapsingMode);
-        }
+        mInNonCollapsingCarryMode = value;
     }
     
 private:
 
     SummaryType     mSummaryType;
+    bool            mInNonCollapsingCarryMode;
 
 };
 

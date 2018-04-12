@@ -4,9 +4,6 @@
  *  icgrep is a trademark of International Characters.
  */
 
-#ifndef LZ4_FRAME_DECODER_H
-#define LZ4_FRAME_DECODER_H
-
 #include <cassert>
 #include <string>
 
@@ -49,5 +46,3 @@ private:
 
     bool decodeFrameDescriptor(std::ifstream & f);
 };
-
-#endif

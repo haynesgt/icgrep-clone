@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2018 International Characters.
+ *  Copyright (c) 2014 International Characters.
  *  This software is licensed to the public under the Open Software License 3.0.
  *  icgrep is a trademark of International Characters.
  */
@@ -9,14 +9,13 @@
 
 #include "re_re.h"
 #include <UCD/unicode_set.h>
-#include <cc/alphabet.h>
 
 namespace re {
 
 using codepoint_t = UCD::codepoint_t;
-using interval_t = UCD::interval_t;
+using interval_t = UCD::UnicodeSet::interval_t;
 
-enum class CC_type {UnicodeClass, ByteClass};
+enum CC_type {UnicodeClass, ByteClass};
 
 class CC : public RE, public UCD::UnicodeSet {
 public:
@@ -28,9 +27,8 @@ public:
         return false;
     }
 
-    const cc::Alphabet * getAlphabet() const { return mAlphabet;}
 
-    std::string canonicalName() const;
+    std::string canonicalName(const CC_type type) const;
 
     inline codepoint_t min_codepoint() const {
         return front().first;
@@ -43,37 +41,56 @@ public:
     virtual ~CC() {}
 
 protected:
-    friend CC * makeCC(const cc::Alphabet * alphabet);
-    friend CC * makeCC(const codepoint_t codepoint, const cc::Alphabet * alphabet);
-    friend CC * makeCC(const codepoint_t lo, const codepoint_t hi, const cc::Alphabet * alphabet);
+    friend CC * makeCC();
+    friend CC * makeCC(const codepoint_t codepoint);
+    friend CC * makeCC(const codepoint_t lo, const codepoint_t hi);
     friend CC * makeCC(const CC * cc1, const CC * cc2);
-    friend CC * makeCC(std::initializer_list<interval_t> list, const cc::Alphabet * alphabet);
-    friend CC * makeCC(std::vector<interval_t> && list, const cc::Alphabet * alphabet);
-    friend CC * makeCC(UCD::UnicodeSet && set, const cc::Alphabet * alphabet);
-    friend bool intersects(const CC * a, const CC * b);
+    friend CC * makeCC(std::initializer_list<interval_t> list);
+    friend CC * makeCC(std::vector<interval_t> && list);
+    friend CC * makeCC(UCD::UnicodeSet && set);
     friend CC * subtractCC(const CC * a, const CC * b);
     friend CC * intersectCC(const CC * a, const CC * b);
-    friend CC * makeByte(const codepoint_t codepoint);
-    friend CC * makeByte(const codepoint_t lo, const codepoint_t hi);
 
-    CC(const cc::Alphabet * alphabet);
+    inline CC()
+    : RE(ClassTypeId::CC) {
+
+    }
 
     CC(const CC & cc);
 
-    CC(const codepoint_t codepoint, const cc::Alphabet * alphabet);
+    inline CC(const codepoint_t codepoint)
+    : RE(ClassTypeId::CC)
+    , UCD::UnicodeSet(codepoint) {
 
-    explicit CC(const codepoint_t lo_codepoint, const codepoint_t hi_codepoint, const cc::Alphabet * alphabet);
+    }
 
-    explicit CC(const CC * cc1, const CC * cc2);
+    inline CC(const codepoint_t lo_codepoint, const codepoint_t hi_codepoint)
+    : RE(ClassTypeId::CC)
+    , UCD::UnicodeSet(lo_codepoint, hi_codepoint) {
 
-    CC(const UCD::UnicodeSet && set, const cc::Alphabet * alphabet);
+    }
 
-    CC(std::initializer_list<interval_t>::iterator begin, std::initializer_list<interval_t>::iterator end, const cc::Alphabet * alphabet);
+    CC(const CC * cc1, const CC * cc2);
 
-    CC(const std::vector<interval_t>::iterator begin, const std::vector<interval_t>::iterator end, const cc::Alphabet * alphabet);
-private:
-    const cc::Alphabet * mAlphabet;
-    
+    inline CC(UCD::UnicodeSet && set)
+    : RE(ClassTypeId::CC)
+    , UCD::UnicodeSet(std::move(set)) {
+
+    }
+
+    CC(std::initializer_list<interval_t>::iterator begin, std::initializer_list<interval_t>::iterator end)
+    : RE(ClassTypeId::CC)
+    , UCD::UnicodeSet(begin, end)
+    {
+
+    }
+
+    CC(const std::vector<interval_t>::iterator begin, const std::vector<interval_t>::iterator end)
+    : RE(ClassTypeId::CC)
+    , UCD::UnicodeSet(begin, end)
+    {
+
+    }
 
 };
 
@@ -107,56 +124,44 @@ inline codepoint_t hi_codepoint(const CC::iterator i) {
  * @return a CC object
  */
 
-inline CC * makeCC(const cc::Alphabet * alphabet = &cc::Unicode) {
-    return new CC(alphabet);
+inline CC * makeCC() {
+    return new CC();
 }
 
-inline CC * makeCC(const codepoint_t codepoint, const cc::Alphabet * alphabet = &cc::Unicode) {
-    return new CC(codepoint, alphabet);
+inline CC * makeCC(const codepoint_t codepoint) {
+    return new CC(codepoint);
 }
 
-inline CC * makeCC(const codepoint_t lo, const codepoint_t hi, const cc::Alphabet * alphabet = &cc::Unicode) {
-    return new CC(lo, hi, alphabet);
+inline CC * makeCC(const codepoint_t lo, const codepoint_t hi) {
+    return new CC(lo, hi);
 }
 
 inline CC * makeCC(const CC * cc1, const CC * cc2) {
     return new CC(cc1, cc2);
 }
 
-inline CC * makeCC(std::initializer_list<interval_t> list, const cc::Alphabet * alphabet = &cc::Unicode) {
-    return new CC(list.begin(), list.end(), alphabet);
+inline CC * makeCC(std::initializer_list<interval_t> list) {
+    return new CC(list.begin(), list.end());
 }
 
-inline CC * makeCC(std::vector<interval_t> && list, const cc::Alphabet * alphabet = &cc::Unicode) {
-    return new CC(list.begin(), list.end(), alphabet);
+inline CC * makeCC(std::vector<interval_t> && list) {
+    return new CC(list.begin(), list.end());
 }
 
-inline CC * makeCC(UCD::UnicodeSet && set, const cc::Alphabet * alphabet = &cc::Unicode) {
-    return new CC(std::move(set), alphabet);
+inline CC * makeCC(UCD::UnicodeSet && set) {
+    return new CC(std::move(set));
 }
 
 inline CC * subtractCC(const CC * a, const CC * b) {
-    //assert (a->getAlphabet() == b->getAlphabet());
-    return new CC(*a - *b, a->getAlphabet());
+    return new CC(*a - *b);
 }
 
 inline CC * intersectCC(const CC * a, const CC * b) {
-    //assert (a->getAlphabet() == b->getAlphabet());
-    return new CC(*a & *b, a->getAlphabet());
+    return new CC(*a & *b);
 }
 
-inline bool intersects(const CC * a, const CC * b) {
-    return (*a).intersects(*b);
-}
+CC * caseInsensitize(const CC * cc);
 
-inline CC * makeByte(const codepoint_t codepoint) {
-    return new CC(codepoint, &cc::Byte);
-}
-
-inline CC * makeByte(const codepoint_t lo, const codepoint_t hi) {
-    return new CC(lo, hi, &cc::Byte);
-}
-    
 }
 
 #endif // RE_CC_H

@@ -18,8 +18,9 @@ class RE;
 class RE_Star_Normal {
 public:
 	static RE * star_normal(RE * re);
+	static RE * helper(RE * re);
 private:
-    static RE * star_rule(RE * re);
+	static bool isNullable(const RE * re);
 };
 
 }

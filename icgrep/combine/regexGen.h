@@ -1,60 +1,60 @@
 #ifndef REGEXGEN_H
 #define REGEXGEN_H
-
+ 
 #include <vector>
 #include <string>
-#include <re/parsers/parser.h>
+#include <re/re_parser.h>
 
 using namespace std;
-
-
 
 class RegexGen {
 
 
 public:
 
-	enum class FileType{
-		SMALL,
-		MEDIUM,
-		LARGE
-	};
-
 	string 				RE;
 	vector<string>		flags;
 	re::RE_Syntax 		syntax;
-	FileType 			fileType;
 
-	RegexGen(std::vector<string> mParameters, std::vector<string> mValues);
+	RegexGen(std::vector<string> header, std::vector<string> row);
+	RegexGen(re::RE_Syntax syntax) : syntax(syntax){}
 
-	// std::vector<string> parseCC();
-
+	std::vector<string> parseCC(std::vector<string> header, std::vector<string> row);
+	
 
 private:
-
-	std::vector<string> mParameters;
-	std::vector<string> mValues;
-
-
+	
 	bool usesCC(std::string op);
-	re::RE_Syntax getSyntax();
-	string parseRE();
-	std::vector<string> parseFlags();
-	FileType getFileTy();
+	re::RE_Syntax setSyntax(std::vector<string> header, std::vector<string> row);
+	string parseRE(std::vector<string> header, std::vector<string> row);
+	std::vector<string> parseFlags(std::vector<string> header, std::vector<string> row);
 	string stringifyLine(vector<string> elements, string separator="");
 
 	string getBoundary();
 	string getNotBoundary();
-	string getWordBegin();
-	string getWordEnd();
-	string getList(std::string cc1, std::string cc2, std::string cc3);
-	string getNList(std::string cc1, std::string cc2, std::string cc3);
+	string getWord();
+	string getNotWord();
+	string getWhitespace();
+	string getNotWhitespace();
+	string getTab();
+	string getDigit();
+	string getNotDigit();
+	string getAny();
+	string getPosix(string value);
+	string getUnicode();
+	string getList();
+	string getNList();
+	string getRange();
+	string getPropertyValue();
+	string getProperty();
+	string getNotProperty();
+	string getName();
 	string getZeroOrOne(string cc);
 	string getZeroOrMore(string cc);
 	string getOneOrMore(string cc);
-	string getRep(string cc, string size);
-	string getRepNM(string cc, string size);
-	string getRepMore(string cc, string size);
+	string getRep(string cc, int rep);
+	string getRep(string cc, int lb, int ub);
+	string getRepMore(string cc, int rep);
 	string getJoin(string LS, string RS);
 	string getBackRef(string cc);
 
@@ -69,5 +69,5 @@ private:
 
 };
 
-
+	
 #endif

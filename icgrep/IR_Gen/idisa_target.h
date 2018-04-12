@@ -8,16 +8,14 @@
 
 namespace llvm { class LLVMContext; }
 namespace kernel { class KernelBuilder; }
-
-extern bool AVX2_available();
+#include <string>
 
 namespace IDISA {
     
 kernel::KernelBuilder * GetIDISA_Builder(llvm::LLVMContext & C);
 
-#ifdef CUDA_ENABLED
 kernel::KernelBuilder * GetIDISA_GPU_Builder(llvm::LLVMContext & C);
-#endif
+
 }
 
 #endif

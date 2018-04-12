@@ -18,232 +18,215 @@
 #include <sstream>
 #include <algorithm>
 #include <iostream>
-#include <re/parsers/parser.h>
+#include <re/re_parser.h>
 #include <functional>
 #include <locale>
 #include <codecvt>
-#include <stdlib.h>
-#include <time.h>
+#include <stdlib.h>     /* srand, rand */
+#include <time.h> 
 #include <UCD/resolve_properties.h>
 #include <UCD/unicode_set.h>
+#include <UCD/PropertyObjects.h>
 
-#include <re/printer_re.h>
+
 using namespace std;
 using namespace re;
 using namespace llvm;
 
+std::vector<std::string> StringGenerator::references;
 
-CC * StringGenerator::getRandomCodepointCC(CC * cc){
-    assert (cc);
-    if (!cc->subset(*getAllCodepoints())) {
-        cc = intersectCC(cc, getAllCodepoints());
+const std::vector<std::string> split(const std::string &s, char delim) {
+    std::vector<std::string> elems;
+    std::stringstream ss;
+    ss.str(s);
+    std::string item;
+    while (std::getline(ss, item, delim)) {
+        elems.push_back(item);
     }
-    if (cc->empty()) {
-        return cc;
-    }
-    int random = rand() % cc->count();
-    return makeCC(cc->at(random));
-
+    return elems;
 }
 
-inline CC * StringGenerator::getAllCodepoints() {
-    assert (allCodepointsCC);
-    return allCodepointsCC;
+// void printVec(std::vector<string> v){
+// 	bool notFirst = false;
+// 	for (auto s : v){
+// 		if (notFirst){
+// 			cout << ",";
+// 		}
+// 		cout << s;
+// 	}
+// }
+vector<string> appendRtoL(std::vector<string> LHS, std::vector<string> RHS){
+	std::copy(RHS.begin(), RHS.end(), std::back_inserter(LHS));
+	return LHS;
 }
 
-string stringifyCC(CC * cc){
-    if (cc->empty()){
-        return "";
-    }
-    std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
-    std::string u8str = converter.to_bytes(lo_codepoint(cc->begin()));
-    return u8str;
+vector<string> getIntersect(vector<string> v1, vector<string> v2)
+{
+
+    vector<string> v3;
+
+    sort(v1.begin(), v1.end());
+    sort(v2.begin(), v2.end());
+
+    set_intersection(v1.begin(),v1.end(),v2.begin(),v2.end(),back_inserter(v3));
+
+    return v3;
 }
 
-string StringGenerator::stringifyVec(vector<CC *> elements) {
+vector<string> getDiff(vector<string> v1, vector<string> v2)
+{
+
+    vector<string> v3;
+
+    sort(v1.begin(), v1.end());
+    sort(v2.begin(), v2.end());
+
+    set_difference(v1.begin(),v1.end(),v2.begin(),v2.end(),back_inserter(v3));
+
+    return v3;
+}
+
+std::vector<string> getAllCodepoints(){
+	std::vector<string> cpSet;
+	unsigned int max = 0x10FFFF;
+	for (unsigned cp = 0; cp < max; ++cp){
+		if (cp < 0xD800 || cp > 0xDFFF) {
+			std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
+    		std::string u8str = converter.to_bytes(cp);
+	    	cpSet.push_back(u8str);
+		}
+	}
+	return cpSet;
+}
+
+string StringGenerator::stringifyVec(vector<string> elements, string separator){
 	string line = "";
-	for (auto e : elements) {
-        if (!e->empty()){
-            line += stringifyCC(getRandomCodepointCC(e));
-        }
+	bool sep = false;
+	for (auto e : elements){
+		line += sep? separator + e : e;
+		sep = true;
 	}
 	return line;
 }
 
-
-string StringGenerator::generate() {
-    if (mSyntax == re::RE_Syntax::FixedStrings) {
-      return mRegex;
-    }
-    else {
-      string result;
-      bool caseInsensitive = std::find(mFlags.begin(), mFlags.end(), "-i") != mFlags.end();
-      if (re::RE * re_ast = re::RE_Parser::parse(mRegex, caseInsensitive, mSyntax)){
-         result = stringifyVec(generate(re_ast));
-      }
-      return result;
-    }
+bool StringGenerator::hasFlag(string flag, std::vector<string> flags){
+	return (std::find(flags.begin(), flags.end(), flag) != flags.end()) ? true : false;
 }
 
-std::vector<CC *> StringGenerator::generate(RE * re, bool Complement, bool getOne) {
-    // cout << Printer_RE::PrintRE(re) << endl;
-   	std::vector<CC*> retVec = {};
+
+string StringGenerator::generate(string re, std::vector<string> flags, re::RE_Syntax syntax){
+
+	bool caseInsensitive = hasFlag("-i", flags);
+
+	re::RE * re_ast = re::RE_Parser::parse(re, caseInsensitive, syntax);
+	string str = stringifyVec(generate(re_ast));
+	return str;
+}
+
+std::vector<std::string> StringGenerator::generate(RE * re) {
+	srand (time(NULL));
+   	std::vector<string> retVec;
     if (re == nullptr) {
         return retVec;
-
-    } else if (isa<Any>(re)) {
-        if (getOne){
-            retVec.push_back(getRandomCodepointCC(getAllCodepoints()));
-        }
-        else{
-            retVec.push_back(getAllCodepoints());
-        }
-
     } else if ( Alt* re_alt = dyn_cast<Alt>(re)) {
-        int random = rand() % re_alt->size();
-        retVec = generate((*re_alt)[random]);
+    	std::vector<string> set;
+    	for ( RE * re : *re_alt){
+    		set = appendRtoL(set, generate(re));
+    	}
+		int random = rand() % set.size();
+		retVec.push_back(set[random]);
+		
     } else if (CC* re_cc = dyn_cast<CC>(re)) {
-        if (!re_cc->empty()){
-            retVec.push_back(subtractCC(re_cc, forbiddenCC));
+        for (auto i : *re_cc) {
+        	for (auto cp = lo_codepoint(i); cp <= hi_codepoint(i); cp++){
+        		std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
+    			std::string u8str = converter.to_bytes(cp);
+	        	retVec.push_back(u8str);
+        	}
         }
     } else if (Name* re_name = dyn_cast<Name>(re)) {
 
     	switch (re_name->getType()) {
-        case Name::Type::Byte:
+    		case Name::Type::Byte:
     		case Name::Type::Unicode:
-		 		retVec = generate(re_name->getDefinition());
+		 		retVec = generate(re_name->getDefinition()); 
 		 		break;
 		 	case Name::Type::UnicodeProperty: {
-                if ((re_name->getName() == "whitespace") && !Complement) {
-                    retVec.push_back(makeCC(0x0020));
-                    break;
-                }
-                UCD::UnicodeSet ucs = UCD::resolveUnicodeSet(re_name);
-
-                if (!ucs.empty()) {
-                    CC * propertyCC = makeCC(std::move(ucs));
-                    if (propertyCC->intersects(*forbiddenCC)) {
-                        propertyCC = subtractCC(propertyCC, forbiddenCC);
-                    }
-                    retVec.push_back(propertyCC);
+	 			UCD::UnicodeSet ucs = UCD::resolveUnicodeSet(re_name);
+		 		for (auto i : ucs){
+		 			for (auto cp = lo_codepoint(i); cp <= hi_codepoint(i); cp++){
+			 			std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
+	    				std::string u8str = converter.to_bytes(cp);
+		   			 	retVec.push_back(u8str);
+		        	}
 		 		}
 		 		break;
 		 	}
     		case Name::Type::Capture: {
-    			std::vector<CC *> set = generate(re_name->getDefinition());
-                std::vector<CC *> ref;
-    			if (!set.empty()){
-                    for (auto s : set) {
-                        if (!s->empty()){
-                            CC * randomCC = getRandomCodepointCC(s);
-                            retVec.push_back(randomCC);
-                            ref.push_back(randomCC);
-                        }
-                    }
-                }
-
-                mReferences.push_back(ref);
+    			std::vector<string> set = generate(re_name->getDefinition());
+    			int random = rand() % set.size();
+    			string str = set[random];
+    			references.push_back(str);
+    			retVec.push_back(str);
     			break;
     		}
 		 	case Name::Type::Reference:
 		 	{
-		 		for (unsigned i = 0; i < mReferences.size(); i++){
-		 			string ref = "\\" + to_string(i+1);
+		 		for (unsigned i = 1; i<10; i++){
+		 			string ref = "\\" + to_string(i);
 		 			if (ref == re_name->getName()){
-		 				retVec = mReferences[i];
-                        break;
+		 				retVec.push_back(references[i-1]);
 		 			}
 		 		}
 		 		break;
 		 	}
-		 	default:
-		 	cerr << "Bad name type" << endl;
-		}
-    } else if (isa<Assertion>(re)) {
+		 	default: 
+		 	retVec.push_back("Bad MyEnum");
+		 }
+    } else if (Assertion * a = dyn_cast<Assertion>(re)) {
     	//Do Nothing
     } else if (Diff* diff = dyn_cast<Diff>(re)) {
-        CC * LHS = makeCC();
-        CC * RHS = makeCC();
-        for (auto cc : generate(diff->getLH())) {
-            LHS = makeCC(LHS, cc);
-        }
-        LHS = subtractCC(LHS, forbiddenCC);
-        for (auto cc : generate(diff->getRH(), true, false)) {
-            RHS = makeCC(RHS, cc);
-        }
-        retVec.push_back(subtractCC(LHS, RHS));
+        std::vector<string> set = getDiff(generate(diff->getLH()), generate(diff->getRH()));
+        retVec = appendRtoL(retVec, set);
     } else if (Intersect* x = dyn_cast<Intersect>(re)) {
-
-        CC * LHS = makeCC();
-        CC * RHS = makeCC();
-        for (auto cc : generate(x->getLH(), true, false)) {
-            LHS = makeCC(LHS, cc);
-        }
-        for (auto cc : generate(x->getRH(), true, false)) {
-            RHS = makeCC(RHS, cc);
-        }
-        retVec.push_back(intersectCC(LHS, RHS));
-
+        std::vector<string> set = getIntersect(generate(x->getLH()), generate(x->getRH()));
+        retVec = appendRtoL(retVec, set);
     } else if (Rep* re_rep = dyn_cast<Rep>(re)) {
-
-        std::vector<CC *> set = generate(re_rep->getRE());
-        if (!set.empty()){
-        	int lb = re_rep->getLB();
-            int ub = (re_rep->getUB() == Rep::UNBOUNDED_REP) ? lb + 1000 : re_rep->getUB();
-
-            int boundRange = (lb == 0)? (ub+1) : (ub - lb + 1);
-        	int random = rand() % boundRange + lb;
-        	// cout << "random bound = " << to_string(random) << endl;
-            for (auto i =0; i < random; ++i){
-                for (auto *s : set) {
-                    retVec.push_back(s);
-                }
-            }
+    	int lb = re_rep->getLB();
+    	int ub = (re_rep->getUB() == Rep::UNBOUNDED_REP) ? lb + 100 : re_rep->getUB();
+    	string ret = "";
+    	
+    	int range = (ub - lb) + 1;
+    	int random = (lb == 0 && ub != 0)? rand() % ub : rand() % range + lb;
+    	
+    	std::vector<string> set = generate(re_rep->getRE());
+        for (auto i =0; i<random; ++i){
+        	srand (time(NULL));
+        	int random2 = rand() % set.size();
+        	ret += set[random2];
         }
-
+        retVec.push_back(ret);
     } else if (Seq* re_seq = dyn_cast<Seq>(re)) {
-
+        bool comma = false;
         for (RE * re : *re_seq) {
-            std::vector<CC *> set = generate(re);
-
-            if (!set.empty()) {
-                for (auto s : set) {
-                    retVec.push_back(getRandomCodepointCC(s));
-                }
+            if (comma) {
+                // retVec.push_back(",");
+            }
+            std::vector<string> set = generate(re);
+            // printVec(set);
+            if (!set.empty()){
+	            int random = rand() % set.size();
+	            retVec.push_back(set[random]);
         	}
+            comma = true;
+
         }
     } else if (isa<Start>(re) || isa<End>(re)) {
-		retVec.push_back(makeCC());
+		retVec.push_back("");
+    } else if (isa<Any>(re)) {
+        retVec = getAllCodepoints();
     } else {
-        cerr << "RE type not recognised\n";
+        retVec.push_back("???");
     }
-    // if (!retVec.empty())
-    //     cout << retVec.back() << endl;
-    // if (!returnCC->empty()) {
-    //     cout << "returnCC = " << Printer_RE::PrintRE(returnCC) << endl;
-    // }
     return retVec;
-}
-
-
-
-StringGenerator::StringGenerator(std::string re, std::vector<std::string> flags, re::RE_Syntax syntax)
-: mRegex(re)
-, mFlags(flags)
-, mSyntax(syntax)
-, asciiCC(re::makeCC(0, 0x007E))
-, unicodeCC(re::makeCC(0, 0xEFFFF))
-, forbiddenCC(re::makeCC({{0x0000, 0x0008}, {0x000A, 0x001F},
-                          {0x007F, 0x007F}, {0x0085, 0x0085},
-                          {0x2028, 0x2029}, {0x2424, 0x2424},
-                          {0x2B89, 0x2B92}, {0x4DD7, 0x4DD7},
-                          {0xD800, 0xDFFF}, {0xE01F0, 0xEFFFF}}))
-, allCodepointsCC(subtractCC((syntax == re::RE_Syntax::PCRE) ? unicodeCC : asciiCC, forbiddenCC))
-{
-
-}
-
-StringGenerator::~StringGenerator() {
-    re::RE::Reset();
-    // UCD::UnicodeSet::Reset();
 }

@@ -6,44 +6,47 @@
 
 
 #include "alphabet.h"
-#include <llvm/Support/ErrorHandling.h>
 
-namespace cc {
-    
-UnicodeMappableAlphabet::UnicodeMappableAlphabet(std::string alphabetName,
-                                                 unsigned unicodeCommon,
-                                                 std::vector <UCD::codepoint_t> aboveCommon) :
-    Alphabet(alphabetName, ClassTypeId::UnicodeMappableAlphabet),
-    mUnicodeCommon(unicodeCommon),
-    mAboveCommon(aboveCommon) {}
 
-UCD::codepoint_t UnicodeMappableAlphabet::toUnicode(const unsigned n) const {
+// Default implementation for simple Unicode subsets.  The codepoint value
+// of the nth character is just the given value n, if it is in range.
+
+UCD::codepoint_t Alphabet::toUnicode(unsigned n) {
     UCD::codepoint_t cp = n;
-    if (n < mUnicodeCommon) return cp;
-    assert(n < mUnicodeCommon + mAboveCommon.size());
-    return mAboveCommon[n - mUnicodeCommon];
-}
+    if (mCharSet.contains(cp)) return cp;
+    throw std::runtime_error("toUnicode: n too large.");
+}   
   
-unsigned UnicodeMappableAlphabet::fromUnicode(const UCD::codepoint_t codepoint) const {
-    unsigned n = codepoint;
-    if (n < mUnicodeCommon) return n;
-    for (unsigned i = 0; i < mAboveCommon.size(); i++) {
-        if (mAboveCommon[i] == codepoint) return mUnicodeCommon + i;
+// Default implementation for simple Unicode subsets.  The ord value
+// of a Unicode codepoint is just the given codepoint, if it is in range.
+
+unsigned Alphabet::fromUnicode(UCD::codepoint_t codepoint) {
+    if (mCharSet.contains(codepoint)) return codepoint;
+    throw std::runtime_error("fromUnicode: codepoint not found in alphabet.");
+}
+
+
+template <class uint_t> ExtendedASCII<uint_t>::ExtendedASCII(std::string alphabetName, const uint_t (& extendedTable)[128]) {
+    mAlphabetName = alphabetName;
+    mExtendedCharacterTable = extendedTable;
+    mCharSet = UCD::UnicodeSet(0, 127);
+    for (unsigned i = 0; i < 128; i++) {
+        mCharSet.insert(extendedTable[i]);
     }
-    llvm::report_fatal_error("fromUnicode: codepoint not found in alphabet.");
+}   
+
+template <class uint_t> UCD::codepoint_t ExtendedASCII<uint_t>::toUnicode(unsigned n) {
+    //  The first 128 characters are just ASCII.
+    if (n < 128) return n;
+    if (n < 256) return mExtendedCharacterTable[n-128];
+    throw std::runtime_error("toUnicode: n too large.");
+}   
+
+template <class uint_t> unsigned ExtendedASCII<uint_t>::fromUnicode(UCD::codepoint_t codepoint) {
+    if (codepoint < 128) return codepoint;
+    for (unsigned i = 0; i < 128; i++) {
+        if (mExtendedCharacterTable[i] == codepoint) return i + 128;
+    }
+    throw std::runtime_error("fromUnicode: codepoint not found in alphabet.");
 }
 
-CodeUnitAlphabet::CodeUnitAlphabet(std::string alphabetName, uint8_t bits) :
-    Alphabet(alphabetName, ClassTypeId::CodeUnitAlphabet), mCodeUnitBits(bits) {}
-
-const UnicodeMappableAlphabet Unicode("Unicode", UCD::UNICODE_MAX, {});
-
-const UnicodeMappableAlphabet ASCII("ASCII", 0x7F, {});
-
-const UnicodeMappableAlphabet ISO_Latin1("ISO_Latin1", 0xFF, {});
-
-const CodeUnitAlphabet Byte("Byte", 8);
-    
-const CodeUnitAlphabet UTF16("UTF16", 16);
-    
-}

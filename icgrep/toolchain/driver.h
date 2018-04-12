@@ -7,7 +7,6 @@
 #include <kernels/kernel.h>
 #include <string>
 #include <vector>
-#include <memory>
 
 namespace llvm { class Function; }
 namespace kernel { class KernelBuilder; }
@@ -23,21 +22,14 @@ public:
         return iBuilder;
     }
 
-    template<typename BufferType, typename... Args>
-    parabix::StreamSetBuffer * addBuffer(Args &&... args) {
-        BufferType * const b = new BufferType(std::forward<Args>(args) ...);
-        mOwnedBuffers.emplace_back(b);
-        if (!std::is_same<BufferType, parabix::ExternalBuffer>::value) {
-            mOwnedBuffers.back()->allocateBuffer(iBuilder);
-        }
-        return b;
-    }
+    parabix::ExternalBuffer * addExternalBuffer(std::unique_ptr<parabix::ExternalBuffer> b);
 
-    template<typename KernelType, typename... Args>
-    kernel::Kernel * addKernelInstance(Args &&... args) {
-        KernelType * const k = new KernelType(std::forward<Args>(args) ...);
-        mOwnedKernels.emplace_back(k);
-        return k;
+    parabix::StreamSetBuffer * addBuffer(std::unique_ptr<parabix::StreamSetBuffer> b);
+
+    kernel::Kernel * addKernelInstance(std::unique_ptr<kernel::Kernel> kb);
+
+    void addKernelCall(kernel::Kernel & kb, const std::vector<parabix::StreamSetBuffer *> & inputs, const std::vector<parabix::StreamSetBuffer *> & outputs) {
+        return makeKernelCall(&kb, inputs, outputs);
     }
 
     virtual void makeKernelCall(kernel::Kernel * kb, const std::vector<parabix::StreamSetBuffer *> & inputs, const std::vector<parabix::StreamSetBuffer *> & outputs) = 0;
@@ -54,8 +46,6 @@ public:
     virtual void finalizeObject() = 0;
     
     virtual void * getMain() = 0; // "main" exists until the driver is deleted
-    
-    virtual void performIncrementalCacheCleanupStep() = 0;
 
 protected:
 

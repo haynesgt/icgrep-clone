@@ -21,7 +21,8 @@ public:
     }
     using length_t = std::string::size_type;
     enum class Type {
-        Unicode
+        Byte
+        , Unicode
         , UnicodeProperty
         , Capture
         , Reference
@@ -31,7 +32,6 @@ public:
     std::string getNamespace() const;
     bool hasNamespace() const;
     std::string getName() const;
-    std::string getFullName() const;
     Type getType() const;
     RE * getDefinition() const;
     bool operator<(const Name & other) const;
@@ -45,9 +45,9 @@ protected:
     friend Name * makeReference(const std::string & name, RE * captureName);
     friend Name * makeZeroWidth(const std::string & name, RE * zerowidth);
     friend Name * makeName(CC * const cc);
+    friend Name * makeByte(CC * const cc);
     friend Name * makeName(const std::string &, Type);
     friend Name * makeName(const std::string &, const std::string &, Type);
-    friend Name * makeName(const std::string & nm, const Name::Type type, RE * defn); 
     Name(const char * nameSpace, const length_t namespaceLength, const char * name, const length_t nameLength, Type type, RE * defn)
     : RE(ClassTypeId::Name)
     , mNamespaceLength(namespaceLength)
@@ -59,12 +59,12 @@ protected:
 
     }
     inline const char * replicateString(const char * string, const length_t length) {
-        if (string && (length > 0)) {
+        if (string) {
             char * allocated = reinterpret_cast<char*>(mAllocator.allocate(length));
             std::memcpy(allocated, string, length);
-            return allocated;
+            string = allocated;
         }
-        return nullptr;
+        return string;
     }
 
 private:
@@ -87,12 +87,7 @@ inline bool Name::hasNamespace() const {
 inline std::string Name::getName() const {
     return std::string(mName, mNameLength);
 }
-
-inline std::string Name::getFullName() const {
-    if (hasNamespace()) return getNamespace() + "=" + getName();
-    else return getName();
-}
-
+    
 inline Name::Type Name::getType() const {
     return mType;
 }
@@ -102,7 +97,6 @@ inline RE * Name::getDefinition() const {
 }
 
 inline void Name::setDefinition(RE * definition) {
-    assert (definition != nullptr);
     assert (definition != this);
     mDefinition = definition;
 }
@@ -132,14 +126,14 @@ inline bool Name::operator < (const CC & other) const {
     if (mDefinition && llvm::isa<CC>(mDefinition)) {
         return *llvm::cast<CC>(mDefinition) < other;
     }
-    return RE::ClassTypeId::Name < RE::ClassTypeId::CC;
+    return false;
 }
 
 inline bool Name::operator > (const CC & other) const {
     if (mDefinition && llvm::isa<CC>(mDefinition)) {
         return other < *llvm::cast<CC>(mDefinition);
     }
-    return RE::ClassTypeId::CC < RE::ClassTypeId::Name;
+    return true;
 }
 
 inline Name * makeName(const std::string & name, const Name::Type type) {
@@ -147,11 +141,7 @@ inline Name * makeName(const std::string & name, const Name::Type type) {
 }
 
 inline Name * makeName(const std::string & property, const std::string & value, const Name::Type type) {
-    return new Name(property.c_str(), property.length(), value.c_str(), value.length(), type, nullptr);
-}
-    
-inline Name * makeName(const std::string & nm, const Name::Type type, RE * defn) {
-    return new Name(nullptr, 0, nm.c_str(), nm.length(), type, defn);
+    return new Name(property.c_str(), property.length(), value.c_str(), value.length(),  type, nullptr);
 }
 
 inline Name * makeName(const std::string & name, RE * cc) {
@@ -159,17 +149,25 @@ inline Name * makeName(const std::string & name, RE * cc) {
         return llvm::cast<Name>(cc);
     }
     else if (llvm::isa<CC>(cc)) {
-        return new Name(nullptr, 0, name.c_str(), name.length(), Name::Type::Unicode, cc);
+        Name::Type ccType = llvm::cast<CC>(cc)->max_codepoint() <= 0x7F ? Name::Type::Byte : Name::Type::Unicode;
+        return new Name(nullptr, 0, name.c_str(), name.length(), ccType, cc);
     }
     else return new Name(nullptr, 0, name.c_str(), name.length(), Name::Type::Unknown, cc);
 }
 
 inline Name * makeName(CC * const cc) {
-    const std::string name = cc->canonicalName();
-    return new Name(nullptr, 0, name.c_str(), name.length(), Name::Type::Unicode, cc);
+    const bool ascii = cc->max_codepoint() <= 0x7F;
+    const std::string name = cc->canonicalName(ascii ? CC_type::ByteClass : CC_type::UnicodeClass);
+    return new Name(nullptr, 0, name.c_str(), name.length(), ascii ? Name::Type::Byte : Name::Type::Unicode, cc);
 }
 
-inline Name * makeCapture(const std::string & name, RE * captured) {
+inline Name * makeByte(CC * const cc) {
+    assert(cc->max_codepoint() <= 0xFF);
+    const std::string name = cc->canonicalName(CC_type::ByteClass);
+    return new Name(nullptr, 0, name.c_str(), name.length(), Name::Type::Byte, cc);
+}
+    
+    inline Name * makeCapture(const std::string & name, RE * captured) {
     return new Name(nullptr, 0, name.c_str(), name.length(), Name::Type::Capture, captured);
 }
     

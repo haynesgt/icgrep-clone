@@ -1,7 +1,7 @@
 #ifndef PROPLIST_H
 #define PROPLIST_H
 /*
- *  Copyright (c) 2017 International Characters, Inc.
+ *  Copyright (c) 2016 International Characters, Inc.
  *  This software is licensed to the public under the Open Software License 3.0.
  *  icgrep is a trademark of International Characters, Inc.
  *
@@ -9,1074 +9,810 @@
  */
 
 #include "PropertyAliases.h"
-#include "PropertyObjects.h"
-#include "PropertyValueAliases.h"
 #include "unicode_set.h"
+#include <vector>
 
 namespace UCD {
     namespace AHEX_ns {
         /** Code Point Ranges for AHex
-        [0030, 0039], [0041, 0046], [0061, 0066]**/
-
-
-        namespace {
-        const static UnicodeSet::run_t __codepoint_set_runs[] = {
-        {Empty, 1}, {Mixed, 3}, {Empty, 34812}};
-        const static UnicodeSet::bitquad_t  __codepoint_set_quads[] = {
-        0x03ff0000, 0x0000007e, 0x0000007e};
-        }
-
-        const static UnicodeSet codepoint_set{const_cast<UnicodeSet::run_t *>(__codepoint_set_runs), 3, 0, const_cast<UnicodeSet::bitquad_t *>(__codepoint_set_quads), 3, 0};
-
-        static BinaryPropertyObject property_object{AHex, std::move(codepoint_set)};
+        [48, 57], [65, 70], [97, 102]**/
+        const UnicodeSet codepoint_set 
+            {{{Empty, 1}, {Mixed, 3}, {Empty, 34812}},
+             {0x03ff0000, 0x0000007e, 0x0000007e}};
+        static BinaryPropertyObject property_object{AHex, codepoint_set};
     }
     namespace BIDI_C_ns {
         /** Code Point Ranges for Bidi_C
-        [061c, 061c], [200e, 200f], [202a, 202e], [2066, 2069]**/
-
-
-        namespace {
-        const static UnicodeSet::run_t __codepoint_set_runs[] = {
-        {Empty, 48}, {Mixed, 1}, {Empty, 207}, {Mixed, 2}, {Empty, 1},
-        {Mixed, 1}, {Empty, 34556}};
-        const static UnicodeSet::bitquad_t  __codepoint_set_quads[] = {
-        0x10000000, 0x0000c000, 0x00007c00, 0x000003c0};
-        }
-
-        const static UnicodeSet codepoint_set{const_cast<UnicodeSet::run_t *>(__codepoint_set_runs), 7, 0, const_cast<UnicodeSet::bitquad_t *>(__codepoint_set_quads), 4, 0};
-
-        static BinaryPropertyObject property_object{Bidi_C, std::move(codepoint_set)};
+        [1564, 1564], [8206, 8207], [8234, 8238], [8294, 8297]**/
+        const UnicodeSet codepoint_set 
+            {{{Empty, 48}, {Mixed, 1}, {Empty, 207}, {Mixed, 2}, {Empty, 1},
+              {Mixed, 1}, {Empty, 34556}},
+             {0x10000000, 0x0000c000, 0x00007c00, 0x000003c0}};
+        static BinaryPropertyObject property_object{Bidi_C, codepoint_set};
     }
     namespace DASH_ns {
         /** Code Point Ranges for Dash
-        [002d, 002d], [058a, 058a], [05be, 05be], [1400, 1400],
-        [1806, 1806], [2010, 2015], [2053, 2053], [207b, 207b],
-        [208b, 208b], [2212, 2212], [2e17, 2e17], [2e1a, 2e1a],
-        [2e3a, 2e3b], [2e40, 2e40], [301c, 301c], [3030, 3030],
-        [30a0, 30a0], [fe31, fe32], [fe58, fe58], [fe63, fe63],
-        [ff0d, ff0d]**/
-
-
-        namespace {
-        const static UnicodeSet::run_t __codepoint_set_runs[] = {
-        {Empty, 1}, {Mixed, 1}, {Empty, 42}, {Mixed, 2}, {Empty, 114},
-        {Mixed, 1}, {Empty, 31}, {Mixed, 1}, {Empty, 63}, {Mixed, 1},
-        {Empty, 1}, {Mixed, 3}, {Empty, 11}, {Mixed, 1}, {Empty, 95},
-        {Mixed, 3}, {Empty, 13}, {Mixed, 2}, {Empty, 3}, {Mixed, 1},
-        {Empty, 1643}, {Mixed, 3}, {Empty, 4}, {Mixed, 1}, {Empty, 32775}};
-        const static UnicodeSet::bitquad_t  __codepoint_set_quads[] = {
-        0x00002000, 0x00000400, 0x40000000, 0x00000001, 0x00000040,
-        0x003f0000, 0x00080000, 0x08000000, 0x00000800, 0x00040000,
-        0x04800000, 0x0c000000, 0x00000001, 0x10000000, 0x00010000,
-        0x00000001, 0x00060000, 0x01000000, 0x00000008, 0x00002000};
-        }
-
-        const static UnicodeSet codepoint_set{const_cast<UnicodeSet::run_t *>(__codepoint_set_runs), 25, 0, const_cast<UnicodeSet::bitquad_t *>(__codepoint_set_quads), 20, 0};
-
-        static BinaryPropertyObject property_object{Dash, std::move(codepoint_set)};
+        [45, 45], [1418, 1418], [1470, 1470], [5120, 5120], [6150, 6150],
+        [8208, 8213], [8275, 8275], [8315, 8315], [8331, 8331],
+        [8722, 8722], [11799, 11799], [11802, 11802], [11834, 11835],
+        [11840, 11840], [12316, 12316], [12336, 12336], [12448, 12448],
+        [65073, 65074], [65112, 65112], [65123, 65123], [65293, 65293]**/
+        const UnicodeSet codepoint_set 
+            {{{Empty, 1}, {Mixed, 1}, {Empty, 42}, {Mixed, 2}, {Empty, 114},
+              {Mixed, 1}, {Empty, 31}, {Mixed, 1}, {Empty, 63}, {Mixed, 1},
+              {Empty, 1}, {Mixed, 3}, {Empty, 11}, {Mixed, 1}, {Empty, 95},
+              {Mixed, 3}, {Empty, 13}, {Mixed, 2}, {Empty, 3}, {Mixed, 1},
+              {Empty, 1643}, {Mixed, 3}, {Empty, 4}, {Mixed, 1},
+              {Empty, 32775}},
+             {0x00002000, 0x00000400, 0x40000000, 0x00000001, 0x00000040,
+              0x003f0000, 0x00080000, 0x08000000, 0x00000800, 0x00040000,
+              0x04800000, 0x0c000000, 0x00000001, 0x10000000, 0x00010000,
+              0x00000001, 0x00060000, 0x01000000, 0x00000008, 0x00002000}};
+        static BinaryPropertyObject property_object{Dash, codepoint_set};
     }
     namespace DEP_ns {
         /** Code Point Ranges for Dep
-        [0149, 0149], [0673, 0673], [0f77, 0f77], [0f79, 0f79],
-        [17a3, 17a4], [206a, 206f], [2329, 232a], [e0001, e0001]**/
-
-
-        namespace {
-        const static UnicodeSet::run_t __codepoint_set_runs[] = {
-        {Empty, 10}, {Mixed, 1}, {Empty, 40}, {Mixed, 1}, {Empty, 71},
-        {Mixed, 1}, {Empty, 65}, {Mixed, 1}, {Empty, 69}, {Mixed, 1},
-        {Empty, 21}, {Mixed, 1}, {Empty, 28390}, {Mixed, 1}, {Empty, 6143}};
-        const static UnicodeSet::bitquad_t  __codepoint_set_quads[] = {
-        0x00000200, 0x00080000, 0x02800000, 0x00000018, 0x0000fc00,
-        0x00000600, 0x00000002};
-        }
-
-        const static UnicodeSet codepoint_set{const_cast<UnicodeSet::run_t *>(__codepoint_set_runs), 15, 0, const_cast<UnicodeSet::bitquad_t *>(__codepoint_set_quads), 7, 0};
-
-        static BinaryPropertyObject property_object{Dep, std::move(codepoint_set)};
+        [329, 329], [1651, 1651], [3959, 3959], [3961, 3961], [6051, 6052],
+        [8298, 8303], [9001, 9002], [917505, 917505]**/
+        const UnicodeSet codepoint_set 
+            {{{Empty, 10}, {Mixed, 1}, {Empty, 40}, {Mixed, 1}, {Empty, 71},
+              {Mixed, 1}, {Empty, 65}, {Mixed, 1}, {Empty, 69}, {Mixed, 1},
+              {Empty, 21}, {Mixed, 1}, {Empty, 28390}, {Mixed, 1},
+              {Empty, 6143}},
+             {0x00000200, 0x00080000, 0x02800000, 0x00000018, 0x0000fc00,
+              0x00000600, 0x00000002}};
+        static BinaryPropertyObject property_object{Dep, codepoint_set};
     }
     namespace DIA_ns {
         /** Code Point Ranges for Dia
-        [005e, 005e], [0060, 0060], [00a8, 00a8], [00af, 00af],
-        [00b4, 00b4], [00b7, 00b8], [02b0, 034e], [0350, 0357],
-        [035d, 0362], [0374, 0375], [037a, 037a], [0384, 0385],
-        [0483, 0487], [0559, 0559], [0591, 05a1], [05a3, 05bd],
-        [05bf, 05bf], [05c1, 05c2], [05c4, 05c4], [064b, 0652],
-        [0657, 0658], [06df, 06e0], [06e5, 06e6], [06ea, 06ec],
-        [0730, 074a], [07a6, 07b0], [07eb, 07f5], [0818, 0819],
-        [08e3, 08fe], [093c, 093c], [094d, 094d], [0951, 0954],
-        [0971, 0971], [09bc, 09bc], [09cd, 09cd], [0a3c, 0a3c],
-        [0a4d, 0a4d], [0abc, 0abc], [0acd, 0acd], [0afd, 0aff],
-        [0b3c, 0b3c], [0b4d, 0b4d], [0bcd, 0bcd], [0c4d, 0c4d],
-        [0cbc, 0cbc], [0ccd, 0ccd], [0d3b, 0d3c], [0d4d, 0d4d],
-        [0dca, 0dca], [0e47, 0e4c], [0e4e, 0e4e], [0ec8, 0ecc],
-        [0f18, 0f19], [0f35, 0f35], [0f37, 0f37], [0f39, 0f39],
-        [0f3e, 0f3f], [0f82, 0f84], [0f86, 0f87], [0fc6, 0fc6],
-        [1037, 1037], [1039, 103a], [1087, 108d], [108f, 108f],
-        [109a, 109b], [17c9, 17d3], [17dd, 17dd], [1939, 193b],
-        [1a75, 1a7c], [1a7f, 1a7f], [1ab0, 1abd], [1b34, 1b34],
-        [1b44, 1b44], [1b6b, 1b73], [1baa, 1bab], [1c36, 1c37],
-        [1c78, 1c7d], [1cd0, 1ce8], [1ced, 1ced], [1cf4, 1cf4],
-        [1cf7, 1cf9], [1d2c, 1d6a], [1dc4, 1dcf], [1df5, 1df9],
-        [1dfd, 1dff], [1fbd, 1fbd], [1fbf, 1fc1], [1fcd, 1fcf],
-        [1fdd, 1fdf], [1fed, 1fef], [1ffd, 1ffe], [2cef, 2cf1],
-        [2e2f, 2e2f], [302a, 302f], [3099, 309c], [30fc, 30fc],
-        [a66f, a66f], [a67c, a67d], [a67f, a67f], [a69c, a69d],
-        [a6f0, a6f1], [a717, a721], [a788, a788], [a7f8, a7f9],
-        [a8c4, a8c4], [a8e0, a8f1], [a92b, a92e], [a953, a953],
-        [a9b3, a9b3], [a9c0, a9c0], [a9e5, a9e5], [aa7b, aa7d],
-        [aabf, aac2], [aaf6, aaf6], [ab5b, ab5f], [abec, abed],
-        [fb1e, fb1e], [fe20, fe2f], [ff3e, ff3e], [ff40, ff40],
-        [ff70, ff70], [ff9e, ff9f], [ffe3, ffe3], [102e0, 102e0],
-        [10ae5, 10ae6], [110b9, 110ba], [11133, 11134], [11173, 11173],
-        [111c0, 111c0], [111ca, 111cc], [11235, 11236], [112e9, 112ea],
-        [1133c, 1133c], [1134d, 1134d], [11366, 1136c], [11370, 11374],
-        [11442, 11442], [11446, 11446], [114c2, 114c3], [115bf, 115c0],
-        [1163f, 1163f], [116b6, 116b7], [1172b, 1172b], [11a34, 11a34],
-        [11a47, 11a47], [11a99, 11a99], [11c3f, 11c3f], [11d42, 11d42],
-        [11d44, 11d45], [16af0, 16af4], [16f8f, 16f9f], [1d167, 1d169],
-        [1d16d, 1d172], [1d17b, 1d182], [1d185, 1d18b], [1d1aa, 1d1ad],
-        [1e8d0, 1e8d6], [1e944, 1e946], [1e948, 1e94a]**/
-
-
-        namespace {
-        const static UnicodeSet::run_t __codepoint_set_runs[] = {
-        {Empty, 2}, {Mixed, 2}, {Empty, 1}, {Mixed, 1}, {Empty, 15},
-        {Mixed, 1}, {Full, 4}, {Mixed, 3}, {Empty, 7}, {Mixed, 1},
-        {Empty, 5}, {Mixed, 1}, {Empty, 1}, {Mixed, 3}, {Empty, 3},
-        {Mixed, 1}, {Empty, 3}, {Mixed, 2}, {Empty, 1}, {Mixed, 2},
-        {Empty, 2}, {Mixed, 1}, {Empty, 1}, {Mixed, 2}, {Empty, 6},
-        {Mixed, 1}, {Empty, 1}, {Mixed, 3}, {Empty, 1}, {Mixed, 2},
-        {Empty, 2}, {Mixed, 2}, {Empty, 2}, {Mixed, 3}, {Empty, 1},
-        {Mixed, 2}, {Empty, 3}, {Mixed, 1}, {Empty, 3}, {Mixed, 1},
-        {Empty, 2}, {Mixed, 2}, {Empty, 2}, {Mixed, 2}, {Empty, 3},
-        {Mixed, 1}, {Empty, 3}, {Mixed, 1}, {Empty, 3}, {Mixed, 1},
-        {Empty, 1}, {Mixed, 2}, {Empty, 2}, {Mixed, 1}, {Empty, 1},
-        {Mixed, 1}, {Empty, 2}, {Mixed, 1}, {Empty, 2}, {Mixed, 1},
-        {Empty, 57}, {Mixed, 1}, {Empty, 10}, {Mixed, 1}, {Empty, 9},
-        {Mixed, 1}, {Empty, 1}, {Mixed, 1}, {Empty, 3}, {Mixed, 3},
-        {Empty, 1}, {Mixed, 1}, {Empty, 3}, {Mixed, 1}, {Empty, 1},
-        {Mixed, 1}, {Empty, 2}, {Mixed, 2}, {Empty, 1}, {Mixed, 1},
-        {Full, 1}, {Mixed, 1}, {Empty, 2}, {Mixed, 2}, {Empty, 13},
-        {Mixed, 3}, {Empty, 103}, {Mixed, 1}, {Empty, 9}, {Mixed, 1},
-        {Empty, 15}, {Mixed, 1}, {Empty, 2}, {Mixed, 1}, {Empty, 2},
-        {Mixed, 1}, {Empty, 939}, {Mixed, 2}, {Empty, 2}, {Mixed, 3},
-        {Empty, 2}, {Mixed, 1}, {Empty, 2}, {Mixed, 1}, {Empty, 6},
-        {Mixed, 2}, {Empty, 1}, {Mixed, 2}, {Empty, 2}, {Mixed, 3},
-        {Empty, 3}, {Mixed, 1}, {Empty, 1}, {Mixed, 3}, {Empty, 2},
-        {Mixed, 1}, {Empty, 4}, {Mixed, 1}, {Empty, 632}, {Mixed, 1},
-        {Empty, 24}, {Mixed, 1}, {Empty, 7}, {Mixed, 4}, {Empty, 2},
-        {Mixed, 1}, {Empty, 23}, {Mixed, 1}, {Empty, 63}, {Mixed, 1},
-        {Empty, 45}, {Mixed, 1}, {Empty, 3}, {Mixed, 1}, {Empty, 1},
-        {Mixed, 1}, {Empty, 2}, {Mixed, 1}, {Empty, 2}, {Mixed, 1},
-        {Empty, 5}, {Mixed, 1}, {Empty, 1}, {Mixed, 3}, {Empty, 6},
-        {Mixed, 1}, {Empty, 3}, {Mixed, 1}, {Empty, 6}, {Mixed, 2},
-        {Empty, 2}, {Mixed, 1}, {Empty, 3}, {Mixed, 1}, {Empty, 3},
-        {Mixed, 1}, {Empty, 23}, {Mixed, 2}, {Empty, 1}, {Mixed, 1},
-        {Empty, 12}, {Mixed, 1}, {Empty, 8}, {Mixed, 1}, {Empty, 620},
-        {Mixed, 1}, {Empty, 36}, {Mixed, 1}, {Empty, 782}, {Mixed, 3},
-        {Empty, 184}, {Mixed, 1}, {Empty, 3}, {Mixed, 1}, {Empty, 30901}};
-        const static UnicodeSet::bitquad_t  __codepoint_set_quads[] = {
-        0x40000000, 0x00000001, 0x01908100, 0xffff0000, 0xe0ff7fff,
-        0x04300007, 0x00000030, 0x000000f8, 0x02000000, 0xfffe0000,
-        0xbffffffb, 0x00000016, 0x0187f800, 0x80000000, 0x00001c61,
-        0xffff0000, 0x000007ff, 0x0001ffc0, 0x003ff800, 0x03000000,
-        0x7ffffff8, 0x10000000, 0x001e2000, 0x00020000, 0x10000000,
-        0x00002000, 0x10000000, 0x00002000, 0x10000000, 0x00002000,
-        0xe0000000, 0x10000000, 0x00002000, 0x00002000, 0x00002000,
-        0x10000000, 0x00002000, 0x18000000, 0x00002000, 0x00000400,
-        0x00005f80, 0x00001f00, 0x03000000, 0xc2a00000, 0x000000dc,
-        0x00000040, 0x06800000, 0x0c00bf80, 0x200ffe00, 0x0e000000,
-        0x9fe00000, 0x3fff0000, 0x00100000, 0x00000010, 0x000ff800,
-        0x00000c00, 0x00c00000, 0x3f000000, 0xffff0000, 0x039021ff,
-        0xfffff000, 0x000007ff, 0x0000fff0, 0xe3e00000, 0xa0000000,
-        0xe000e003, 0x6000e000, 0x00038000, 0x00008000, 0x0000fc00,
-        0x1e000000, 0x10000000, 0xb0008000, 0x30000000, 0x00030000,
-        0xff800000, 0x00000003, 0x00000100, 0x03000000, 0x00000010,
-        0x0003ffff, 0x00007800, 0x00080000, 0x00080000, 0x00000001,
-        0x00000020, 0x38000000, 0x80000000, 0x00000007, 0x00400000,
-        0xf8000000, 0x00003000, 0x40000000, 0x0000ffff, 0x40000000,
-        0x00000001, 0x00010000, 0xc0000000, 0x00000008, 0x00000001,
-        0x00000060, 0x06000000, 0x00180000, 0x00080000, 0x00001c01,
-        0x00600000, 0x00000600, 0x10000000, 0x00002000, 0x001f1fc0,
-        0x00000044, 0x0000000c, 0x80000000, 0x00000001, 0x80000000,
-        0x00c00000, 0x00000800, 0x00100000, 0x00000080, 0x02000000,
-        0x80000000, 0x00000034, 0x001f0000, 0xffff8000, 0xf807e380,
-        0x00000fe7, 0x00003c00, 0x007f0000, 0x00000770};
-        }
-
-        const static UnicodeSet codepoint_set{const_cast<UnicodeSet::run_t *>(__codepoint_set_runs), 175, 0, const_cast<UnicodeSet::bitquad_t *>(__codepoint_set_quads), 129, 0};
-
-        static BinaryPropertyObject property_object{Dia, std::move(codepoint_set)};
+        [94, 94], [96, 96], [168, 168], [175, 175], [180, 180], [183, 184],
+        [688, 846], [848, 855], [861, 866], [884, 885], [890, 890],
+        [900, 901], [1155, 1159], [1369, 1369], [1425, 1441], [1443, 1469],
+        [1471, 1471], [1473, 1474], [1476, 1476], [1611, 1618],
+        [1623, 1624], [1759, 1760], [1765, 1766], [1770, 1772],
+        [1840, 1866], [1958, 1968], [2027, 2037], [2072, 2073],
+        [2275, 2302], [2364, 2364], [2381, 2381], [2385, 2388],
+        [2417, 2417], [2492, 2492], [2509, 2509], [2620, 2620],
+        [2637, 2637], [2748, 2748], [2765, 2765], [2876, 2876],
+        [2893, 2893], [3021, 3021], [3149, 3149], [3260, 3260],
+        [3277, 3277], [3405, 3405], [3530, 3530], [3655, 3660],
+        [3662, 3662], [3784, 3788], [3864, 3865], [3893, 3893],
+        [3895, 3895], [3897, 3897], [3902, 3903], [3970, 3972],
+        [3974, 3975], [4038, 4038], [4151, 4151], [4153, 4154],
+        [4231, 4237], [4239, 4239], [4250, 4251], [6089, 6099],
+        [6109, 6109], [6457, 6459], [6773, 6780], [6783, 6783],
+        [6832, 6845], [6964, 6964], [6980, 6980], [7019, 7027],
+        [7082, 7083], [7222, 7223], [7288, 7293], [7376, 7400],
+        [7405, 7405], [7412, 7412], [7416, 7417], [7468, 7530],
+        [7620, 7631], [7669, 7669], [7677, 7679], [8125, 8125],
+        [8127, 8129], [8141, 8143], [8157, 8159], [8173, 8175],
+        [8189, 8190], [11503, 11505], [11823, 11823], [12330, 12335],
+        [12441, 12444], [12540, 12540], [42607, 42607], [42620, 42621],
+        [42623, 42623], [42652, 42653], [42736, 42737], [42775, 42785],
+        [42888, 42888], [43000, 43001], [43204, 43204], [43232, 43249],
+        [43307, 43310], [43347, 43347], [43443, 43443], [43456, 43456],
+        [43493, 43493], [43643, 43645], [43711, 43714], [43766, 43766],
+        [43867, 43871], [44012, 44013], [64286, 64286], [65056, 65071],
+        [65342, 65342], [65344, 65344], [65392, 65392], [65438, 65439],
+        [65507, 65507], [66272, 66272], [68325, 68326], [69817, 69818],
+        [69939, 69940], [70003, 70003], [70080, 70080], [70090, 70092],
+        [70197, 70198], [70377, 70378], [70460, 70460], [70477, 70477],
+        [70502, 70508], [70512, 70516], [70722, 70722], [70726, 70726],
+        [70850, 70851], [71103, 71104], [71231, 71231], [71350, 71351],
+        [71467, 71467], [72767, 72767], [92912, 92916], [94095, 94111],
+        [119143, 119145], [119149, 119154], [119163, 119170],
+        [119173, 119179], [119210, 119213], [125136, 125142],
+        [125252, 125254], [125256, 125258]**/
+        const UnicodeSet codepoint_set 
+            {{{Empty, 2}, {Mixed, 2}, {Empty, 1}, {Mixed, 1}, {Empty, 15},
+              {Mixed, 1}, {Full, 4}, {Mixed, 3}, {Empty, 7}, {Mixed, 1},
+              {Empty, 5}, {Mixed, 1}, {Empty, 1}, {Mixed, 3}, {Empty, 3},
+              {Mixed, 1}, {Empty, 3}, {Mixed, 2}, {Empty, 1}, {Mixed, 2},
+              {Empty, 2}, {Mixed, 1}, {Empty, 1}, {Mixed, 2}, {Empty, 6},
+              {Mixed, 1}, {Empty, 1}, {Mixed, 3}, {Empty, 1}, {Mixed, 2},
+              {Empty, 2}, {Mixed, 2}, {Empty, 2}, {Mixed, 2}, {Empty, 2},
+              {Mixed, 2}, {Empty, 3}, {Mixed, 1}, {Empty, 3}, {Mixed, 1},
+              {Empty, 2}, {Mixed, 2}, {Empty, 3}, {Mixed, 1}, {Empty, 3},
+              {Mixed, 1}, {Empty, 3}, {Mixed, 1}, {Empty, 3}, {Mixed, 1},
+              {Empty, 1}, {Mixed, 2}, {Empty, 2}, {Mixed, 1}, {Empty, 1},
+              {Mixed, 1}, {Empty, 2}, {Mixed, 1}, {Empty, 2}, {Mixed, 1},
+              {Empty, 57}, {Mixed, 1}, {Empty, 10}, {Mixed, 1}, {Empty, 9},
+              {Mixed, 1}, {Empty, 1}, {Mixed, 1}, {Empty, 3}, {Mixed, 3},
+              {Empty, 1}, {Mixed, 1}, {Empty, 3}, {Mixed, 1}, {Empty, 1},
+              {Mixed, 1}, {Empty, 2}, {Mixed, 2}, {Empty, 1}, {Mixed, 1},
+              {Full, 1}, {Mixed, 1}, {Empty, 2}, {Mixed, 2}, {Empty, 13},
+              {Mixed, 3}, {Empty, 103}, {Mixed, 1}, {Empty, 9}, {Mixed, 1},
+              {Empty, 15}, {Mixed, 1}, {Empty, 2}, {Mixed, 1}, {Empty, 2},
+              {Mixed, 1}, {Empty, 939}, {Mixed, 2}, {Empty, 2}, {Mixed, 3},
+              {Empty, 2}, {Mixed, 1}, {Empty, 2}, {Mixed, 1}, {Empty, 6},
+              {Mixed, 2}, {Empty, 1}, {Mixed, 2}, {Empty, 2}, {Mixed, 3},
+              {Empty, 3}, {Mixed, 1}, {Empty, 1}, {Mixed, 3}, {Empty, 2},
+              {Mixed, 1}, {Empty, 4}, {Mixed, 1}, {Empty, 632}, {Mixed, 1},
+              {Empty, 24}, {Mixed, 1}, {Empty, 7}, {Mixed, 4}, {Empty, 2},
+              {Mixed, 1}, {Empty, 23}, {Mixed, 1}, {Empty, 63}, {Mixed, 1},
+              {Empty, 45}, {Mixed, 1}, {Empty, 3}, {Mixed, 1}, {Empty, 1},
+              {Mixed, 1}, {Empty, 2}, {Mixed, 1}, {Empty, 2}, {Mixed, 1},
+              {Empty, 5}, {Mixed, 1}, {Empty, 1}, {Mixed, 3}, {Empty, 6},
+              {Mixed, 1}, {Empty, 3}, {Mixed, 1}, {Empty, 6}, {Mixed, 2},
+              {Empty, 2}, {Mixed, 1}, {Empty, 3}, {Mixed, 1}, {Empty, 3},
+              {Mixed, 1}, {Empty, 39}, {Mixed, 1}, {Empty, 629}, {Mixed, 1},
+              {Empty, 36}, {Mixed, 1}, {Empty, 782}, {Mixed, 3},
+              {Empty, 184}, {Mixed, 1}, {Empty, 3}, {Mixed, 1},
+              {Empty, 30901}},
+             {0x40000000, 0x00000001, 0x01908100, 0xffff0000, 0xe0ff7fff,
+              0x04300007, 0x00000030, 0x000000f8, 0x02000000, 0xfffe0000,
+              0xbffffffb, 0x00000016, 0x0187f800, 0x80000000, 0x00001c61,
+              0xffff0000, 0x000007ff, 0x0001ffc0, 0x003ff800, 0x03000000,
+              0x7ffffff8, 0x10000000, 0x001e2000, 0x00020000, 0x10000000,
+              0x00002000, 0x10000000, 0x00002000, 0x10000000, 0x00002000,
+              0x10000000, 0x00002000, 0x00002000, 0x00002000, 0x10000000,
+              0x00002000, 0x00002000, 0x00000400, 0x00005f80, 0x00001f00,
+              0x03000000, 0xc2a00000, 0x000000dc, 0x00000040, 0x06800000,
+              0x0c00bf80, 0x200ffe00, 0x0e000000, 0x9fe00000, 0x3fff0000,
+              0x00100000, 0x00000010, 0x000ff800, 0x00000c00, 0x00c00000,
+              0x3f000000, 0xffff0000, 0x031021ff, 0xfffff000, 0x000007ff,
+              0x0000fff0, 0xe0200000, 0xa0000000, 0xe000e003, 0x6000e000,
+              0x00038000, 0x00008000, 0x0000fc00, 0x1e000000, 0x10000000,
+              0xb0008000, 0x30000000, 0x00030000, 0xff800000, 0x00000003,
+              0x00000100, 0x03000000, 0x00000010, 0x0003ffff, 0x00007800,
+              0x00080000, 0x00080000, 0x00000001, 0x00000020, 0x38000000,
+              0x80000000, 0x00000007, 0x00400000, 0xf8000000, 0x00003000,
+              0x40000000, 0x0000ffff, 0x40000000, 0x00000001, 0x00010000,
+              0xc0000000, 0x00000008, 0x00000001, 0x00000060, 0x06000000,
+              0x00180000, 0x00080000, 0x00001c01, 0x00600000, 0x00000600,
+              0x10000000, 0x00002000, 0x001f1fc0, 0x00000044, 0x0000000c,
+              0x80000000, 0x00000001, 0x80000000, 0x00c00000, 0x00000800,
+              0x80000000, 0x001f0000, 0xffff8000, 0xf807e380, 0x00000fe7,
+              0x00003c00, 0x007f0000, 0x00000770}};
+        static BinaryPropertyObject property_object{Dia, codepoint_set};
     }
     namespace EXT_ns {
         /** Code Point Ranges for Ext
-        [00b7, 00b7], [02d0, 02d1], [0640, 0640], [07fa, 07fa],
-        [0e46, 0e46], [0ec6, 0ec6], [180a, 180a], [1843, 1843],
-        [1aa7, 1aa7], [1c36, 1c36], [1c7b, 1c7b], [3005, 3005],
-        [3031, 3035], [309d, 309e], [30fc, 30fe], [a015, a015],
-        [a60c, a60c], [a9cf, a9cf], [a9e6, a9e6], [aa70, aa70],
-        [aadd, aadd], [aaf3, aaf4], [ff70, ff70], [1135d, 1135d],
-        [115c6, 115c8], [11a98, 11a98], [16b42, 16b43], [16fe0, 16fe1],
-        [1e944, 1e946]**/
-
-
-        namespace {
-        const static UnicodeSet::run_t __codepoint_set_runs[] = {
-        {Empty, 5}, {Mixed, 1}, {Empty, 16}, {Mixed, 1}, {Empty, 27},
-        {Mixed, 1}, {Empty, 12}, {Mixed, 1}, {Empty, 50}, {Mixed, 1},
-        {Empty, 3}, {Mixed, 1}, {Empty, 73}, {Mixed, 1}, {Empty, 1},
-        {Mixed, 1}, {Empty, 18}, {Mixed, 1}, {Empty, 11}, {Mixed, 1},
-        {Empty, 1}, {Mixed, 1}, {Empty, 156}, {Mixed, 2}, {Empty, 2},
-        {Mixed, 1}, {Empty, 2}, {Mixed, 1}, {Empty, 888}, {Mixed, 1},
-        {Empty, 47}, {Mixed, 1}, {Empty, 29}, {Mixed, 2}, {Empty, 3},
-        {Mixed, 1}, {Empty, 2}, {Mixed, 2}, {Empty, 675}, {Mixed, 1},
-        {Empty, 158}, {Mixed, 1}, {Empty, 19}, {Mixed, 1}, {Empty, 37},
-        {Mixed, 1}, {Empty, 645}, {Mixed, 1}, {Empty, 36}, {Mixed, 1},
-        {Empty, 970}, {Mixed, 1}, {Empty, 30901}};
-        const static UnicodeSet::bitquad_t  __codepoint_set_quads[] = {
-        0x00800000, 0x00030000, 0x00000001, 0x04000000, 0x00000040,
-        0x00000040, 0x00000400, 0x00000008, 0x00000080, 0x00400000,
-        0x08000000, 0x00000020, 0x003e0000, 0x60000000, 0x70000000,
-        0x00200000, 0x00001000, 0x00008000, 0x00000040, 0x00010000,
-        0x20000000, 0x00180000, 0x00010000, 0x20000000, 0x000001c0,
-        0x01000000, 0x0000000c, 0x00000003, 0x00000070};
-        }
-
-        const static UnicodeSet codepoint_set{const_cast<UnicodeSet::run_t *>(__codepoint_set_runs), 53, 0, const_cast<UnicodeSet::bitquad_t *>(__codepoint_set_quads), 29, 0};
-
-        static BinaryPropertyObject property_object{Ext, std::move(codepoint_set)};
+        [183, 183], [720, 721], [1600, 1600], [2042, 2042], [3654, 3654],
+        [3782, 3782], [6154, 6154], [6211, 6211], [6823, 6823],
+        [7222, 7222], [7291, 7291], [12293, 12293], [12337, 12341],
+        [12445, 12446], [12540, 12542], [40981, 40981], [42508, 42508],
+        [43471, 43471], [43494, 43494], [43632, 43632], [43741, 43741],
+        [43763, 43764], [65392, 65392], [70493, 70493], [71110, 71112],
+        [92994, 92995], [94176, 94176], [125252, 125254]**/
+        const UnicodeSet codepoint_set 
+            {{{Empty, 5}, {Mixed, 1}, {Empty, 16}, {Mixed, 1}, {Empty, 27},
+              {Mixed, 1}, {Empty, 12}, {Mixed, 1}, {Empty, 50}, {Mixed, 1},
+              {Empty, 3}, {Mixed, 1}, {Empty, 73}, {Mixed, 1}, {Empty, 1},
+              {Mixed, 1}, {Empty, 18}, {Mixed, 1}, {Empty, 11}, {Mixed, 1},
+              {Empty, 1}, {Mixed, 1}, {Empty, 156}, {Mixed, 2}, {Empty, 2},
+              {Mixed, 1}, {Empty, 2}, {Mixed, 1}, {Empty, 888}, {Mixed, 1},
+              {Empty, 47}, {Mixed, 1}, {Empty, 29}, {Mixed, 2}, {Empty, 3},
+              {Mixed, 1}, {Empty, 2}, {Mixed, 2}, {Empty, 675}, {Mixed, 1},
+              {Empty, 158}, {Mixed, 1}, {Empty, 19}, {Mixed, 1},
+              {Empty, 683}, {Mixed, 1}, {Empty, 36}, {Mixed, 1},
+              {Empty, 970}, {Mixed, 1}, {Empty, 30901}},
+             {0x00800000, 0x00030000, 0x00000001, 0x04000000, 0x00000040,
+              0x00000040, 0x00000400, 0x00000008, 0x00000080, 0x00400000,
+              0x08000000, 0x00000020, 0x003e0000, 0x60000000, 0x70000000,
+              0x00200000, 0x00001000, 0x00008000, 0x00000040, 0x00010000,
+              0x20000000, 0x00180000, 0x00010000, 0x20000000, 0x000001c0,
+              0x0000000c, 0x00000001, 0x00000070}};
+        static BinaryPropertyObject property_object{Ext, codepoint_set};
     }
     namespace HEX_ns {
         /** Code Point Ranges for Hex
-        [0030, 0039], [0041, 0046], [0061, 0066], [ff10, ff19],
-        [ff21, ff26], [ff41, ff46]**/
-
-
-        namespace {
-        const static UnicodeSet::run_t __codepoint_set_runs[] = {
-        {Empty, 1}, {Mixed, 3}, {Empty, 2036}, {Mixed, 3}, {Empty, 32773}};
-        const static UnicodeSet::bitquad_t  __codepoint_set_quads[] = {
-        0x03ff0000, 0x0000007e, 0x0000007e, 0x03ff0000, 0x0000007e,
-        0x0000007e};
-        }
-
-        const static UnicodeSet codepoint_set{const_cast<UnicodeSet::run_t *>(__codepoint_set_runs), 5, 0, const_cast<UnicodeSet::bitquad_t *>(__codepoint_set_quads), 6, 0};
-
-        static BinaryPropertyObject property_object{Hex, std::move(codepoint_set)};
+        [48, 57], [65, 70], [97, 102], [65296, 65305], [65313, 65318],
+        [65345, 65350]**/
+        const UnicodeSet codepoint_set 
+            {{{Empty, 1}, {Mixed, 3}, {Empty, 2036}, {Mixed, 3},
+              {Empty, 32773}},
+             {0x03ff0000, 0x0000007e, 0x0000007e, 0x03ff0000, 0x0000007e,
+              0x0000007e}};
+        static BinaryPropertyObject property_object{Hex, codepoint_set};
     }
     namespace HYPHEN_ns {
-        static ObsoletePropertyObject property_object(Hyphen);
+        /** Code Point Ranges for Hyphen
+        [45, 45], [173, 173], [1418, 1418], [6150, 6150], [8208, 8209],
+        [11799, 11799], [12539, 12539], [65123, 65123], [65293, 65293],
+        [65381, 65381]**/
+        const UnicodeSet codepoint_set 
+            {{{Empty, 1}, {Mixed, 1}, {Empty, 3}, {Mixed, 1}, {Empty, 38},
+              {Mixed, 1}, {Empty, 147}, {Mixed, 1}, {Empty, 63}, {Mixed, 1},
+              {Empty, 111}, {Mixed, 1}, {Empty, 22}, {Mixed, 1},
+              {Empty, 1643}, {Mixed, 1}, {Empty, 4}, {Mixed, 1}, {Empty, 2},
+              {Mixed, 1}, {Empty, 32772}},
+             {0x00002000, 0x00002000, 0x00000400, 0x00000040, 0x00030000,
+              0x00800000, 0x08000000, 0x00000008, 0x00002000, 0x00000020}};
+        static BinaryPropertyObject property_object{Hyphen, codepoint_set};
     }
     namespace IDSB_ns {
         /** Code Point Ranges for IDSB
-        [2ff0, 2ff1], [2ff4, 2ffb]**/
-
-
-        namespace {
-        const static UnicodeSet::run_t __codepoint_set_runs[] = {
-        {Empty, 383}, {Mixed, 1}, {Empty, 34432}};
-        const static UnicodeSet::bitquad_t  __codepoint_set_quads[] = {
-        0x0ff30000};
-        }
-
-        const static UnicodeSet codepoint_set{const_cast<UnicodeSet::run_t *>(__codepoint_set_runs), 3, 0, const_cast<UnicodeSet::bitquad_t *>(__codepoint_set_quads), 1, 0};
-
-        static BinaryPropertyObject property_object{IDSB, std::move(codepoint_set)};
+        [12272, 12273], [12276, 12283]**/
+        const UnicodeSet codepoint_set 
+            {{{Empty, 383}, {Mixed, 1}, {Empty, 34432}},
+             {0x0ff30000}};
+        static BinaryPropertyObject property_object{IDSB, codepoint_set};
     }
     namespace IDST_ns {
         /** Code Point Ranges for IDST
-        [2ff2, 2ff3]**/
-
-
-        namespace {
-        const static UnicodeSet::run_t __codepoint_set_runs[] = {
-        {Empty, 383}, {Mixed, 1}, {Empty, 34432}};
-        const static UnicodeSet::bitquad_t  __codepoint_set_quads[] = {
-        0x000c0000};
-        }
-
-        const static UnicodeSet codepoint_set{const_cast<UnicodeSet::run_t *>(__codepoint_set_runs), 3, 0, const_cast<UnicodeSet::bitquad_t *>(__codepoint_set_quads), 1, 0};
-
-        static BinaryPropertyObject property_object{IDST, std::move(codepoint_set)};
+        [12274, 12275]**/
+        const UnicodeSet codepoint_set 
+            {{{Empty, 383}, {Mixed, 1}, {Empty, 34432}},
+             {0x000c0000}};
+        static BinaryPropertyObject property_object{IDST, codepoint_set};
     }
     namespace IDEO_ns {
         /** Code Point Ranges for Ideo
-        [3006, 3007], [3021, 3029], [3038, 303a], [3400, 4db5],
-        [4e00, 9fea], [f900, fa6d], [fa70, fad9], [17000, 187ec],
-        [18800, 18af2], [1b170, 1b2fb], [20000, 2a6d6], [2a700, 2b734],
-        [2b740, 2b81d], [2b820, 2cea1], [2ceb0, 2ebe0], [2f800, 2fa1d]**/
-
-
-        namespace {
-        const static UnicodeSet::run_t __codepoint_set_runs[] = {
-        {Empty, 384}, {Mixed, 2}, {Empty, 30}, {Full, 205}, {Mixed, 1},
-        {Empty, 2}, {Full, 655}, {Mixed, 1}, {Empty, 712}, {Full, 11},
-        {Mixed, 1}, {Full, 2}, {Mixed, 1}, {Empty, 937}, {Full, 191},
-        {Mixed, 1}, {Full, 23}, {Mixed, 1}, {Empty, 307}, {Mixed, 1},
-        {Full, 11}, {Mixed, 1}, {Empty, 616}, {Full, 1334}, {Mixed, 1},
-        {Empty, 1}, {Full, 129}, {Mixed, 1}, {Full, 6}, {Mixed, 1},
-        {Full, 180}, {Mixed, 1}, {Full, 233}, {Mixed, 1}, {Empty, 96},
-        {Full, 16}, {Mixed, 1}, {Empty, 28719}};
-        const static UnicodeSet::bitquad_t  __codepoint_set_quads[] = {
-        0x000000c0, 0x070003fe, 0x003fffff, 0x000007ff, 0xffff3fff,
-        0x03ffffff, 0x00001fff, 0x0007ffff, 0xffff0000, 0x0fffffff,
-        0x007fffff, 0x001fffff, 0x3fffffff, 0xffff0003, 0x00000001,
-        0x3fffffff};
-        }
-
-        const static UnicodeSet codepoint_set{const_cast<UnicodeSet::run_t *>(__codepoint_set_runs), 38, 0, const_cast<UnicodeSet::bitquad_t *>(__codepoint_set_quads), 16, 0};
-
-        static BinaryPropertyObject property_object{Ideo, std::move(codepoint_set)};
+        [12294, 12295], [12321, 12329], [12344, 12346], [13312, 19893],
+        [19968, 40917], [63744, 64109], [64112, 64217], [94208, 100332],
+        [100352, 101106], [131072, 173782], [173824, 177972],
+        [177984, 178205], [178208, 183969], [194560, 195101]**/
+        const UnicodeSet codepoint_set 
+            {{{Empty, 384}, {Mixed, 2}, {Empty, 30}, {Full, 205},
+              {Mixed, 1}, {Empty, 2}, {Full, 654}, {Mixed, 1}, {Empty, 713},
+              {Full, 11}, {Mixed, 1}, {Full, 2}, {Mixed, 1}, {Empty, 937},
+              {Full, 191}, {Mixed, 1}, {Full, 23}, {Mixed, 1}, {Empty, 936},
+              {Full, 1334}, {Mixed, 1}, {Empty, 1}, {Full, 129}, {Mixed, 1},
+              {Full, 6}, {Mixed, 1}, {Full, 180}, {Mixed, 1}, {Empty, 330},
+              {Full, 16}, {Mixed, 1}, {Empty, 28719}},
+             {0x000000c0, 0x070003fe, 0x003fffff, 0x003fffff, 0xffff3fff,
+              0x03ffffff, 0x00001fff, 0x0007ffff, 0x007fffff, 0x001fffff,
+              0x3fffffff, 0x00000003, 0x3fffffff}};
+        static BinaryPropertyObject property_object{Ideo, codepoint_set};
     }
     namespace JOIN_C_ns {
         /** Code Point Ranges for Join_C
-        [200c, 200d]**/
-
-
-        namespace {
-        const static UnicodeSet::run_t __codepoint_set_runs[] = {
-        {Empty, 256}, {Mixed, 1}, {Empty, 34559}};
-        const static UnicodeSet::bitquad_t  __codepoint_set_quads[] = {
-        0x00003000};
-        }
-
-        const static UnicodeSet codepoint_set{const_cast<UnicodeSet::run_t *>(__codepoint_set_runs), 3, 0, const_cast<UnicodeSet::bitquad_t *>(__codepoint_set_quads), 1, 0};
-
-        static BinaryPropertyObject property_object{Join_C, std::move(codepoint_set)};
+        [8204, 8205]**/
+        const UnicodeSet codepoint_set 
+            {{{Empty, 256}, {Mixed, 1}, {Empty, 34559}},
+             {0x00003000}};
+        static BinaryPropertyObject property_object{Join_C, codepoint_set};
     }
     namespace LOE_ns {
         /** Code Point Ranges for LOE
-        [0e40, 0e44], [0ec0, 0ec4], [19b5, 19b7], [19ba, 19ba],
-        [aab5, aab6], [aab9, aab9], [aabb, aabc]**/
-
-
-        namespace {
-        const static UnicodeSet::run_t __codepoint_set_runs[] = {
-        {Empty, 114}, {Mixed, 1}, {Empty, 3}, {Mixed, 1}, {Empty, 86},
-        {Mixed, 1}, {Empty, 1159}, {Mixed, 1}, {Empty, 33450}};
-        const static UnicodeSet::bitquad_t  __codepoint_set_quads[] = {
-        0x0000001f, 0x0000001f, 0x04e00000, 0x1a600000};
-        }
-
-        const static UnicodeSet codepoint_set{const_cast<UnicodeSet::run_t *>(__codepoint_set_runs), 9, 0, const_cast<UnicodeSet::bitquad_t *>(__codepoint_set_quads), 4, 0};
-
-        static BinaryPropertyObject property_object{LOE, std::move(codepoint_set)};
+        [3648, 3652], [3776, 3780], [6581, 6583], [6586, 6586],
+        [43701, 43702], [43705, 43705], [43707, 43708]**/
+        const UnicodeSet codepoint_set 
+            {{{Empty, 114}, {Mixed, 1}, {Empty, 3}, {Mixed, 1}, {Empty, 86},
+              {Mixed, 1}, {Empty, 1159}, {Mixed, 1}, {Empty, 33450}},
+             {0x0000001f, 0x0000001f, 0x04e00000, 0x1a600000}};
+        static BinaryPropertyObject property_object{LOE, codepoint_set};
     }
     namespace NCHAR_ns {
         /** Code Point Ranges for NChar
-        [fdd0, fdef], [fffe, ffff], [1fffe, 1ffff], [2fffe, 2ffff],
-        [3fffe, 3ffff], [4fffe, 4ffff], [5fffe, 5ffff], [6fffe, 6ffff],
-        [7fffe, 7ffff], [8fffe, 8ffff], [9fffe, 9ffff], [afffe, affff],
-        [bfffe, bffff], [cfffe, cffff], [dfffe, dffff], [efffe, effff],
-        [ffffe, fffff], [10fffe, 10ffff]**/
-
-
-        namespace {
-        const static UnicodeSet::run_t __codepoint_set_runs[] = {
-        {Empty, 2030}, {Mixed, 2}, {Empty, 15}, {Mixed, 1}, {Empty, 2047},
-        {Mixed, 1}, {Empty, 2047}, {Mixed, 1}, {Empty, 2047}, {Mixed, 1},
-        {Empty, 2047}, {Mixed, 1}, {Empty, 2047}, {Mixed, 1}, {Empty, 2047},
-        {Mixed, 1}, {Empty, 2047}, {Mixed, 1}, {Empty, 2047}, {Mixed, 1},
-        {Empty, 2047}, {Mixed, 1}, {Empty, 2047}, {Mixed, 1}, {Empty, 2047},
-        {Mixed, 1}, {Empty, 2047}, {Mixed, 1}, {Empty, 2047}, {Mixed, 1},
-        {Empty, 2047}, {Mixed, 1}, {Empty, 2047}, {Mixed, 1}, {Empty, 2047},
-        {Mixed, 1}};
-        const static UnicodeSet::bitquad_t  __codepoint_set_quads[] = {
-        0xffff0000, 0x0000ffff, 0xc0000000, 0xc0000000, 0xc0000000,
-        0xc0000000, 0xc0000000, 0xc0000000, 0xc0000000, 0xc0000000,
-        0xc0000000, 0xc0000000, 0xc0000000, 0xc0000000, 0xc0000000,
-        0xc0000000, 0xc0000000, 0xc0000000, 0xc0000000};
-        }
-
-        const static UnicodeSet codepoint_set{const_cast<UnicodeSet::run_t *>(__codepoint_set_runs), 36, 0, const_cast<UnicodeSet::bitquad_t *>(__codepoint_set_quads), 19, 0};
-
-        static BinaryPropertyObject property_object{NChar, std::move(codepoint_set)};
+        [64976, 65007], [65534, 65535], [131070, 131071], [196606, 196607],
+        [262142, 262143], [327678, 327679], [393214, 393215],
+        [458750, 458751], [524286, 524287], [589822, 589823],
+        [655358, 655359], [720894, 720895], [786430, 786431],
+        [851966, 851967], [917502, 917503], [983038, 983039],
+        [1048574, 1048575], [1114110, 1114111]**/
+        const UnicodeSet codepoint_set 
+            {{{Empty, 2030}, {Mixed, 2}, {Empty, 15}, {Mixed, 1},
+              {Empty, 2047}, {Mixed, 1}, {Empty, 2047}, {Mixed, 1},
+              {Empty, 2047}, {Mixed, 1}, {Empty, 2047}, {Mixed, 1},
+              {Empty, 2047}, {Mixed, 1}, {Empty, 2047}, {Mixed, 1},
+              {Empty, 2047}, {Mixed, 1}, {Empty, 2047}, {Mixed, 1},
+              {Empty, 2047}, {Mixed, 1}, {Empty, 2047}, {Mixed, 1},
+              {Empty, 2047}, {Mixed, 1}, {Empty, 2047}, {Mixed, 1},
+              {Empty, 2047}, {Mixed, 1}, {Empty, 2047}, {Mixed, 1},
+              {Empty, 2047}, {Mixed, 1}, {Empty, 2047}, {Mixed, 1}},
+             {0xffff0000, 0x0000ffff, 0xc0000000, 0xc0000000, 0xc0000000,
+              0xc0000000, 0xc0000000, 0xc0000000, 0xc0000000, 0xc0000000,
+              0xc0000000, 0xc0000000, 0xc0000000, 0xc0000000, 0xc0000000,
+              0xc0000000, 0xc0000000, 0xc0000000, 0xc0000000}};
+        static BinaryPropertyObject property_object{NChar, codepoint_set};
     }
     namespace OALPHA_ns {
         /** Code Point Ranges for OAlpha
-        [0345, 0345], [05b0, 05bd], [05bf, 05bf], [05c1, 05c2],
-        [05c4, 05c5], [05c7, 05c7], [0610, 061a], [064b, 0657],
-        [0659, 065f], [0670, 0670], [06d6, 06dc], [06e1, 06e4],
-        [06e7, 06e8], [06ed, 06ed], [0711, 0711], [0730, 073f],
-        [07a6, 07b0], [0816, 0817], [081b, 0823], [0825, 0827],
-        [0829, 082c], [08d4, 08df], [08e3, 08e9], [08f0, 0903],
-        [093a, 093b], [093e, 094c], [094e, 094f], [0955, 0957],
-        [0962, 0963], [0981, 0983], [09be, 09c4], [09c7, 09c8],
-        [09cb, 09cc], [09d7, 09d7], [09e2, 09e3], [0a01, 0a03],
-        [0a3e, 0a42], [0a47, 0a48], [0a4b, 0a4c], [0a51, 0a51],
-        [0a70, 0a71], [0a75, 0a75], [0a81, 0a83], [0abe, 0ac5],
-        [0ac7, 0ac9], [0acb, 0acc], [0ae2, 0ae3], [0afa, 0afc],
-        [0b01, 0b03], [0b3e, 0b44], [0b47, 0b48], [0b4b, 0b4c],
-        [0b56, 0b57], [0b62, 0b63], [0b82, 0b82], [0bbe, 0bc2],
-        [0bc6, 0bc8], [0bca, 0bcc], [0bd7, 0bd7], [0c00, 0c03],
-        [0c3e, 0c44], [0c46, 0c48], [0c4a, 0c4c], [0c55, 0c56],
-        [0c62, 0c63], [0c81, 0c83], [0cbe, 0cc4], [0cc6, 0cc8],
-        [0cca, 0ccc], [0cd5, 0cd6], [0ce2, 0ce3], [0d00, 0d03],
-        [0d3e, 0d44], [0d46, 0d48], [0d4a, 0d4c], [0d57, 0d57],
-        [0d62, 0d63], [0d82, 0d83], [0dcf, 0dd4], [0dd6, 0dd6],
-        [0dd8, 0ddf], [0df2, 0df3], [0e31, 0e31], [0e34, 0e3a],
-        [0e4d, 0e4d], [0eb1, 0eb1], [0eb4, 0eb9], [0ebb, 0ebc],
-        [0ecd, 0ecd], [0f71, 0f81], [0f8d, 0f97], [0f99, 0fbc],
-        [102b, 1036], [1038, 1038], [103b, 103e], [1056, 1059],
-        [105e, 1060], [1062, 1062], [1067, 1068], [1071, 1074],
-        [1082, 1086], [109c, 109d], [135f, 135f], [1712, 1713],
-        [1732, 1733], [1752, 1753], [1772, 1773], [17b6, 17c8],
-        [1885, 1886], [18a9, 18a9], [1920, 192b], [1930, 1938],
-        [1a17, 1a1b], [1a55, 1a5e], [1a61, 1a74], [1b00, 1b04],
-        [1b35, 1b43], [1b80, 1b82], [1ba1, 1ba9], [1bac, 1bad],
-        [1be7, 1bf1], [1c24, 1c35], [1cf2, 1cf3], [1de7, 1df4],
-        [24b6, 24e9], [2de0, 2dff], [a674, a67b], [a69e, a69f],
-        [a823, a827], [a880, a881], [a8b4, a8c3], [a8c5, a8c5],
-        [a926, a92a], [a947, a952], [a980, a983], [a9b4, a9bf],
-        [aa29, aa36], [aa43, aa43], [aa4c, aa4d], [aab0, aab0],
-        [aab2, aab4], [aab7, aab8], [aabe, aabe], [aaeb, aaef],
-        [aaf5, aaf5], [abe3, abea], [fb1e, fb1e], [10376, 1037a],
-        [10a01, 10a03], [10a05, 10a06], [10a0c, 10a0f], [11000, 11002],
-        [11038, 11045], [11082, 11082], [110b0, 110b8], [11100, 11102],
-        [11127, 11132], [11180, 11182], [111b3, 111bf], [1122c, 11234],
-        [11237, 11237], [1123e, 1123e], [112df, 112e8], [11300, 11303],
-        [1133e, 11344], [11347, 11348], [1134b, 1134c], [11357, 11357],
-        [11362, 11363], [11435, 11441], [11443, 11445], [114b0, 114c1],
-        [115af, 115b5], [115b8, 115be], [115dc, 115dd], [11630, 1163e],
-        [11640, 11640], [116ab, 116b5], [1171d, 1172a], [11a01, 11a0a],
-        [11a35, 11a39], [11a3b, 11a3e], [11a51, 11a5b], [11a8a, 11a97],
-        [11c2f, 11c36], [11c38, 11c3e], [11c92, 11ca7], [11ca9, 11cb6],
-        [11d31, 11d36], [11d3a, 11d3a], [11d3c, 11d3d], [11d3f, 11d41],
-        [11d43, 11d43], [11d47, 11d47], [16b30, 16b36], [16f51, 16f7e],
-        [1bc9e, 1bc9e], [1e000, 1e006], [1e008, 1e018], [1e01b, 1e021],
-        [1e023, 1e024], [1e026, 1e02a], [1e947, 1e947], [1f130, 1f149],
-        [1f150, 1f169], [1f170, 1f189]**/
-
-
-        namespace {
-        const static UnicodeSet::run_t __codepoint_set_runs[] = {
-        {Empty, 26}, {Mixed, 1}, {Empty, 18}, {Mixed, 2}, {Empty, 1},
-        {Mixed, 1}, {Empty, 1}, {Mixed, 2}, {Empty, 2}, {Mixed, 4},
-        {Empty, 3}, {Mixed, 1}, {Empty, 2}, {Mixed, 2}, {Empty, 4},
-        {Mixed, 25}, {Empty, 1}, {Mixed, 13}, {Empty, 1}, {Mixed, 2},
-        {Empty, 1}, {Mixed, 2}, {Empty, 2}, {Mixed, 2}, {Empty, 4},
-        {Mixed, 3}, {Empty, 3}, {Mixed, 4}, {Empty, 21}, {Mixed, 1},
-        {Empty, 29}, {Mixed, 4}, {Empty, 1}, {Mixed, 2}, {Empty, 5},
-        {Mixed, 2}, {Empty, 3}, {Mixed, 1}, {Empty, 6}, {Mixed, 1},
-        {Empty, 1}, {Mixed, 2}, {Empty, 4}, {Mixed, 3}, {Empty, 1},
-        {Mixed, 2}, {Empty, 1}, {Mixed, 1}, {Empty, 1}, {Mixed, 1},
-        {Empty, 5}, {Mixed, 1}, {Empty, 7}, {Mixed, 1}, {Empty, 53},
-        {Mixed, 1}, {Full, 1}, {Mixed, 1}, {Empty, 71}, {Full, 1},
-        {Empty, 963}, {Mixed, 2}, {Empty, 12}, {Mixed, 1}, {Empty, 2},
-        {Mixed, 3}, {Empty, 2}, {Mixed, 2}, {Empty, 1}, {Mixed, 2},
-        {Empty, 3}, {Mixed, 2}, {Empty, 2}, {Mixed, 1}, {Empty, 1},
-        {Mixed, 1}, {Empty, 7}, {Mixed, 1}, {Empty, 632}, {Mixed, 1},
-        {Empty, 66}, {Mixed, 1}, {Empty, 52}, {Mixed, 1}, {Empty, 47},
-        {Mixed, 3}, {Empty, 1}, {Mixed, 2}, {Empty, 2}, {Mixed, 2},
-        {Empty, 2}, {Mixed, 2}, {Empty, 3}, {Mixed, 1}, {Empty, 4},
-        {Mixed, 6}, {Empty, 5}, {Mixed, 2}, {Empty, 2}, {Mixed, 2},
-        {Empty, 6}, {Mixed, 2}, {Empty, 2}, {Mixed, 2}, {Empty, 2},
-        {Mixed, 1}, {Empty, 2}, {Mixed, 2}, {Empty, 22}, {Mixed, 3},
-        {Empty, 1}, {Mixed, 1}, {Empty, 12}, {Mixed, 1}, {Empty, 2},
-        {Mixed, 2}, {Empty, 3}, {Mixed, 2}, {Empty, 622}, {Mixed, 1},
-        {Empty, 32}, {Mixed, 2}, {Empty, 616}, {Mixed, 1}, {Empty, 283},
-        {Mixed, 2}, {Empty, 72}, {Mixed, 1}, {Empty, 62}, {Mixed, 4},
-        {Empty, 30835}};
-        const static UnicodeSet::bitquad_t  __codepoint_set_quads[] = {
-        0x00000020, 0xbfff0000, 0x000000b6, 0x07ff0000, 0xfefff800,
-        0x00010000, 0x1fc00000, 0x0000219e, 0x00020000, 0xffff0000,
-        0x0001ffc0, 0xf8c00000, 0x00001eef, 0xfff00000, 0xffff03f8,
-        0x0000000f, 0xcc000000, 0x00e0dfff, 0x0000000c, 0x0000000e,
-        0xc0000000, 0x0080199f, 0x0000000c, 0x0000000e, 0xc0000000,
-        0x00021987, 0x00230000, 0x0000000e, 0xc0000000, 0x00001bbf,
-        0x1c00000c, 0x0000000e, 0xc0000000, 0x00c0199f, 0x0000000c,
-        0x00000004, 0xc0000000, 0x00801dc7, 0x0000000f, 0xc0000000,
-        0x00601ddf, 0x0000000c, 0x0000000e, 0xc0000000, 0x00601ddf,
-        0x0000000c, 0x0000000f, 0xc0000000, 0x00801ddf, 0x0000000c,
-        0x0000000c, 0xff5f8000, 0x000c0000, 0x07f20000, 0x00002000,
-        0x1bf20000, 0x00002000, 0xfffe0000, 0xfeffe003, 0x1fffffff,
-        0x797ff800, 0xc3c00000, 0x001e0185, 0x3000007c, 0x80000000,
-        0x000c0000, 0x000c0000, 0x000c0000, 0x000c0000, 0xffc00000,
-        0x000001ff, 0x00000060, 0x00000200, 0x01ff0fff, 0x0f800000,
-        0x7fe00000, 0x001ffffe, 0x0000001f, 0xffe00000, 0x0000000f,
-        0x00000007, 0x000033fe, 0x0003ff80, 0x003ffff0, 0x000c0000,
-        0x001fff80, 0xffc00000, 0x000003ff, 0x0ff00000, 0xc0000000,
-        0x000000f8, 0x00000003, 0xfff00000, 0x0000002f, 0x000007c0,
-        0x0007ff80, 0x0000000f, 0xfff00000, 0x007ffe00, 0x00003008,
-        0x419d0000, 0x0020f800, 0x000007f8, 0x40000000, 0x07c00000,
-        0x0000f06e, 0x00000007, 0xff000000, 0x0000003f, 0x00000004,
-        0x01ff0000, 0x00000007, 0x0007ff80, 0x00000007, 0xfff80000,
-        0x409ff000, 0x80000000, 0x000001ff, 0x0000000f, 0xc0000000,
-        0x0080199f, 0x0000000c, 0xffe00000, 0x0000003b, 0xffff0000,
-        0x00000003, 0x7f3f8000, 0x30000000, 0x7fff0000, 0x00000001,
-        0x003ff800, 0xe0000000, 0x000007ff, 0x000007fe, 0x7be00000,
-        0x0ffe0000, 0x00fffc00, 0x7f7f8000, 0xfffc0000, 0x007ffeff,
-        0xb47e0000, 0x0000008b, 0x007f0000, 0xfffe0000, 0x7fffffff,
-        0x40000000, 0xf9ffff7f, 0x000007db, 0x00000080, 0xffff0000,
-        0xffff03ff, 0xffff03ff, 0x000003ff};
-        }
-
-        const static UnicodeSet codepoint_set{const_cast<UnicodeSet::run_t *>(__codepoint_set_runs), 131, 0, const_cast<UnicodeSet::bitquad_t *>(__codepoint_set_quads), 153, 0};
-
-        static BinaryPropertyObject property_object{OAlpha, std::move(codepoint_set)};
+        [837, 837], [1456, 1469], [1471, 1471], [1473, 1474], [1476, 1477],
+        [1479, 1479], [1552, 1562], [1611, 1623], [1625, 1631],
+        [1648, 1648], [1750, 1756], [1761, 1764], [1767, 1768],
+        [1773, 1773], [1809, 1809], [1840, 1855], [1958, 1968],
+        [2070, 2071], [2075, 2083], [2085, 2087], [2089, 2092],
+        [2260, 2271], [2275, 2281], [2288, 2307], [2362, 2363],
+        [2366, 2380], [2382, 2383], [2389, 2391], [2402, 2403],
+        [2433, 2435], [2494, 2500], [2503, 2504], [2507, 2508],
+        [2519, 2519], [2530, 2531], [2561, 2563], [2622, 2626],
+        [2631, 2632], [2635, 2636], [2641, 2641], [2672, 2673],
+        [2677, 2677], [2689, 2691], [2750, 2757], [2759, 2761],
+        [2763, 2764], [2786, 2787], [2817, 2819], [2878, 2884],
+        [2887, 2888], [2891, 2892], [2902, 2903], [2914, 2915],
+        [2946, 2946], [3006, 3010], [3014, 3016], [3018, 3020],
+        [3031, 3031], [3072, 3075], [3134, 3140], [3142, 3144],
+        [3146, 3148], [3157, 3158], [3170, 3171], [3201, 3203],
+        [3262, 3268], [3270, 3272], [3274, 3276], [3285, 3286],
+        [3298, 3299], [3329, 3331], [3390, 3396], [3398, 3400],
+        [3402, 3404], [3415, 3415], [3426, 3427], [3458, 3459],
+        [3535, 3540], [3542, 3542], [3544, 3551], [3570, 3571],
+        [3633, 3633], [3636, 3642], [3661, 3661], [3761, 3761],
+        [3764, 3769], [3771, 3772], [3789, 3789], [3953, 3969],
+        [3981, 3991], [3993, 4028], [4139, 4150], [4152, 4152],
+        [4155, 4158], [4182, 4185], [4190, 4192], [4194, 4194],
+        [4199, 4200], [4209, 4212], [4226, 4230], [4252, 4253],
+        [4959, 4959], [5906, 5907], [5938, 5939], [5970, 5971],
+        [6002, 6003], [6070, 6088], [6277, 6278], [6313, 6313],
+        [6432, 6443], [6448, 6456], [6679, 6683], [6741, 6750],
+        [6753, 6772], [6912, 6916], [6965, 6979], [7040, 7042],
+        [7073, 7081], [7084, 7085], [7143, 7153], [7204, 7221],
+        [7410, 7411], [7655, 7668], [9398, 9449], [11744, 11775],
+        [42612, 42619], [42654, 42655], [43043, 43047], [43136, 43137],
+        [43188, 43203], [43205, 43205], [43302, 43306], [43335, 43346],
+        [43392, 43395], [43444, 43455], [43561, 43574], [43587, 43587],
+        [43596, 43597], [43696, 43696], [43698, 43700], [43703, 43704],
+        [43710, 43710], [43755, 43759], [43765, 43765], [44003, 44010],
+        [64286, 64286], [66422, 66426], [68097, 68099], [68101, 68102],
+        [68108, 68111], [69632, 69634], [69688, 69701], [69762, 69762],
+        [69808, 69816], [69888, 69890], [69927, 69938], [70016, 70018],
+        [70067, 70079], [70188, 70196], [70199, 70199], [70206, 70206],
+        [70367, 70376], [70400, 70403], [70462, 70468], [70471, 70472],
+        [70475, 70476], [70487, 70487], [70498, 70499], [70709, 70721],
+        [70723, 70725], [70832, 70849], [71087, 71093], [71096, 71102],
+        [71132, 71133], [71216, 71230], [71232, 71232], [71339, 71349],
+        [71453, 71466], [72751, 72758], [72760, 72766], [72850, 72871],
+        [72873, 72886], [92976, 92982], [94033, 94078], [113822, 113822],
+        [122880, 122886], [122888, 122904], [122907, 122913],
+        [122915, 122916], [122918, 122922], [125255, 125255],
+        [127280, 127305], [127312, 127337], [127344, 127369]**/
+        const UnicodeSet codepoint_set 
+            {{{Empty, 26}, {Mixed, 1}, {Empty, 18}, {Mixed, 2}, {Empty, 1},
+              {Mixed, 1}, {Empty, 1}, {Mixed, 2}, {Empty, 2}, {Mixed, 4},
+              {Empty, 3}, {Mixed, 1}, {Empty, 2}, {Mixed, 2}, {Empty, 4},
+              {Mixed, 25}, {Empty, 1}, {Mixed, 13}, {Empty, 1}, {Mixed, 2},
+              {Empty, 1}, {Mixed, 2}, {Empty, 2}, {Mixed, 2}, {Empty, 4},
+              {Mixed, 3}, {Empty, 3}, {Mixed, 4}, {Empty, 21}, {Mixed, 1},
+              {Empty, 29}, {Mixed, 4}, {Empty, 1}, {Mixed, 2}, {Empty, 5},
+              {Mixed, 2}, {Empty, 3}, {Mixed, 1}, {Empty, 6}, {Mixed, 1},
+              {Empty, 1}, {Mixed, 2}, {Empty, 4}, {Mixed, 3}, {Empty, 1},
+              {Mixed, 2}, {Empty, 1}, {Mixed, 1}, {Empty, 1}, {Mixed, 1},
+              {Empty, 5}, {Mixed, 1}, {Empty, 7}, {Mixed, 1}, {Empty, 53},
+              {Mixed, 1}, {Full, 1}, {Mixed, 1}, {Empty, 71}, {Full, 1},
+              {Empty, 963}, {Mixed, 2}, {Empty, 12}, {Mixed, 1}, {Empty, 2},
+              {Mixed, 3}, {Empty, 2}, {Mixed, 2}, {Empty, 1}, {Mixed, 2},
+              {Empty, 3}, {Mixed, 2}, {Empty, 2}, {Mixed, 1}, {Empty, 1},
+              {Mixed, 1}, {Empty, 7}, {Mixed, 1}, {Empty, 632}, {Mixed, 1},
+              {Empty, 66}, {Mixed, 1}, {Empty, 52}, {Mixed, 1}, {Empty, 47},
+              {Mixed, 3}, {Empty, 1}, {Mixed, 2}, {Empty, 2}, {Mixed, 2},
+              {Empty, 2}, {Mixed, 2}, {Empty, 3}, {Mixed, 1}, {Empty, 4},
+              {Mixed, 6}, {Empty, 5}, {Mixed, 2}, {Empty, 2}, {Mixed, 2},
+              {Empty, 6}, {Mixed, 2}, {Empty, 2}, {Mixed, 2}, {Empty, 2},
+              {Mixed, 1}, {Empty, 2}, {Mixed, 2}, {Empty, 39}, {Mixed, 1},
+              {Empty, 2}, {Mixed, 2}, {Empty, 627}, {Mixed, 1}, {Empty, 32},
+              {Mixed, 2}, {Empty, 616}, {Mixed, 1}, {Empty, 283},
+              {Mixed, 2}, {Empty, 72}, {Mixed, 1}, {Empty, 62}, {Mixed, 4},
+              {Empty, 30835}},
+             {0x00000020, 0xbfff0000, 0x000000b6, 0x07ff0000, 0xfefff800,
+              0x00010000, 0x1fc00000, 0x0000219e, 0x00020000, 0xffff0000,
+              0x0001ffc0, 0xf8c00000, 0x00001eef, 0xfff00000, 0xffff03f8,
+              0x0000000f, 0xcc000000, 0x00e0dfff, 0x0000000c, 0x0000000e,
+              0xc0000000, 0x0080199f, 0x0000000c, 0x0000000e, 0xc0000000,
+              0x00021987, 0x00230000, 0x0000000e, 0xc0000000, 0x00001bbf,
+              0x0000000c, 0x0000000e, 0xc0000000, 0x00c0199f, 0x0000000c,
+              0x00000004, 0xc0000000, 0x00801dc7, 0x0000000f, 0xc0000000,
+              0x00601ddf, 0x0000000c, 0x0000000e, 0xc0000000, 0x00601ddf,
+              0x0000000c, 0x0000000e, 0xc0000000, 0x00801ddf, 0x0000000c,
+              0x0000000c, 0xff5f8000, 0x000c0000, 0x07f20000, 0x00002000,
+              0x1bf20000, 0x00002000, 0xfffe0000, 0xfeffe003, 0x1fffffff,
+              0x797ff800, 0xc3c00000, 0x001e0185, 0x3000007c, 0x80000000,
+              0x000c0000, 0x000c0000, 0x000c0000, 0x000c0000, 0xffc00000,
+              0x000001ff, 0x00000060, 0x00000200, 0x01ff0fff, 0x0f800000,
+              0x7fe00000, 0x001ffffe, 0x0000001f, 0xffe00000, 0x0000000f,
+              0x00000007, 0x000033fe, 0x0003ff80, 0x003ffff0, 0x000c0000,
+              0x001fff80, 0xffc00000, 0x000003ff, 0x0ff00000, 0xc0000000,
+              0x000000f8, 0x00000003, 0xfff00000, 0x0000002f, 0x000007c0,
+              0x0007ff80, 0x0000000f, 0xfff00000, 0x007ffe00, 0x00003008,
+              0x419d0000, 0x0020f800, 0x000007f8, 0x40000000, 0x07c00000,
+              0x0000f06e, 0x00000007, 0xff000000, 0x0000003f, 0x00000004,
+              0x01ff0000, 0x00000007, 0x0007ff80, 0x00000007, 0xfff80000,
+              0x409ff000, 0x80000000, 0x000001ff, 0x0000000f, 0xc0000000,
+              0x0080199f, 0x0000000c, 0xffe00000, 0x0000003b, 0xffff0000,
+              0x00000003, 0x7f3f8000, 0x30000000, 0x7fff0000, 0x00000001,
+              0x003ff800, 0xe0000000, 0x000007ff, 0x7f7f8000, 0xfffc0000,
+              0x007ffeff, 0x007f0000, 0xfffe0000, 0x7fffffff, 0x40000000,
+              0xf9ffff7f, 0x000007db, 0x00000080, 0xffff0000, 0xffff03ff,
+              0xffff03ff, 0x000003ff}};
+        static BinaryPropertyObject property_object{OAlpha, codepoint_set};
     }
     namespace ODI_ns {
         /** Code Point Ranges for ODI
-        [034f, 034f], [115f, 1160], [17b4, 17b5], [2065, 2065],
-        [3164, 3164], [ffa0, ffa0], [fff0, fff8], [e0000, e0000],
-        [e0002, e001f], [e0080, e00ff], [e01f0, e0fff]**/
-
-
-        namespace {
-        const static UnicodeSet::run_t __codepoint_set_runs[] = {
-        {Empty, 26}, {Mixed, 1}, {Empty, 111}, {Mixed, 2}, {Empty, 49},
-        {Mixed, 1}, {Empty, 69}, {Mixed, 1}, {Empty, 135}, {Mixed, 1},
-        {Empty, 1649}, {Mixed, 1}, {Empty, 1}, {Mixed, 1}, {Empty, 26624},
-        {Mixed, 1}, {Empty, 3}, {Full, 4}, {Empty, 7}, {Mixed, 1},
-        {Full, 112}, {Empty, 6016}};
-        const static UnicodeSet::bitquad_t  __codepoint_set_quads[] = {
-        0x00008000, 0x80000000, 0x00000001, 0x00300000, 0x00000020,
-        0x00000010, 0x00000001, 0x01ff0000, 0xfffffffd, 0xffff0000};
-        }
-
-        const static UnicodeSet codepoint_set{const_cast<UnicodeSet::run_t *>(__codepoint_set_runs), 22, 0, const_cast<UnicodeSet::bitquad_t *>(__codepoint_set_quads), 10, 0};
-
-        static BinaryPropertyObject property_object{ODI, std::move(codepoint_set)};
+        [847, 847], [4447, 4448], [6068, 6069], [8293, 8293],
+        [12644, 12644], [65440, 65440], [65520, 65528], [917504, 917504],
+        [917506, 917535], [917632, 917759], [918000, 921599]**/
+        const UnicodeSet codepoint_set 
+            {{{Empty, 26}, {Mixed, 1}, {Empty, 111}, {Mixed, 2},
+              {Empty, 49}, {Mixed, 1}, {Empty, 69}, {Mixed, 1},
+              {Empty, 135}, {Mixed, 1}, {Empty, 1649}, {Mixed, 1},
+              {Empty, 1}, {Mixed, 1}, {Empty, 26624}, {Mixed, 1},
+              {Empty, 3}, {Full, 4}, {Empty, 7}, {Mixed, 1}, {Full, 112},
+              {Empty, 6016}},
+             {0x00008000, 0x80000000, 0x00000001, 0x00300000, 0x00000020,
+              0x00000010, 0x00000001, 0x01ff0000, 0xfffffffd, 0xffff0000}};
+        static BinaryPropertyObject property_object{ODI, codepoint_set};
     }
     namespace OGR_EXT_ns {
         /** Code Point Ranges for OGr_Ext
-        [09be, 09be], [09d7, 09d7], [0b3e, 0b3e], [0b57, 0b57],
-        [0bbe, 0bbe], [0bd7, 0bd7], [0cc2, 0cc2], [0cd5, 0cd6],
-        [0d3e, 0d3e], [0d57, 0d57], [0dcf, 0dcf], [0ddf, 0ddf],
-        [200c, 200c], [302e, 302f], [ff9e, ff9f], [1133e, 1133e],
-        [11357, 11357], [114b0, 114b0], [114bd, 114bd], [115af, 115af],
-        [1d165, 1d165], [1d16e, 1d172], [e0020, e007f]**/
-
-
-        namespace {
-        const static UnicodeSet::run_t __codepoint_set_runs[] = {
-        {Empty, 77}, {Mixed, 2}, {Empty, 10}, {Mixed, 2}, {Empty, 2},
-        {Mixed, 2}, {Empty, 7}, {Mixed, 1}, {Empty, 2}, {Mixed, 2},
-        {Empty, 3}, {Mixed, 1}, {Empty, 145}, {Mixed, 1}, {Empty, 128},
-        {Mixed, 1}, {Empty, 1658}, {Mixed, 1}, {Empty, 156}, {Mixed, 2},
-        {Empty, 10}, {Mixed, 1}, {Empty, 7}, {Mixed, 1}, {Empty, 1501},
-        {Mixed, 1}, {Empty, 24949}, {Full, 3}, {Empty, 6140}};
-        const static UnicodeSet::bitquad_t  __codepoint_set_quads[] = {
-        0x40000000, 0x00800000, 0x40000000, 0x00800000, 0x40000000,
-        0x00800000, 0x00600004, 0x40000000, 0x00800000, 0x80008000,
-        0x00001000, 0x0000c000, 0xc0000000, 0x40000000, 0x00800000,
-        0x20010000, 0x00008000, 0x0007c020};
-        }
-
-        const static UnicodeSet codepoint_set{const_cast<UnicodeSet::run_t *>(__codepoint_set_runs), 29, 0, const_cast<UnicodeSet::bitquad_t *>(__codepoint_set_quads), 18, 0};
-
-        static BinaryPropertyObject property_object{OGr_Ext, std::move(codepoint_set)};
+        [2494, 2494], [2519, 2519], [2878, 2878], [2903, 2903],
+        [3006, 3006], [3031, 3031], [3266, 3266], [3285, 3286],
+        [3390, 3390], [3415, 3415], [3535, 3535], [3551, 3551],
+        [8204, 8204], [12334, 12335], [65438, 65439], [70462, 70462],
+        [70487, 70487], [70832, 70832], [70845, 70845], [71087, 71087],
+        [119141, 119141], [119150, 119154], [917536, 917631]**/
+        const UnicodeSet codepoint_set 
+            {{{Empty, 77}, {Mixed, 2}, {Empty, 10}, {Mixed, 2}, {Empty, 2},
+              {Mixed, 2}, {Empty, 7}, {Mixed, 1}, {Empty, 2}, {Mixed, 2},
+              {Empty, 3}, {Mixed, 1}, {Empty, 145}, {Mixed, 1},
+              {Empty, 128}, {Mixed, 1}, {Empty, 1658}, {Mixed, 1},
+              {Empty, 156}, {Mixed, 2}, {Empty, 10}, {Mixed, 1}, {Empty, 7},
+              {Mixed, 1}, {Empty, 1501}, {Mixed, 1}, {Empty, 24949},
+              {Full, 3}, {Empty, 6140}},
+             {0x40000000, 0x00800000, 0x40000000, 0x00800000, 0x40000000,
+              0x00800000, 0x00600004, 0x40000000, 0x00800000, 0x80008000,
+              0x00001000, 0x0000c000, 0xc0000000, 0x40000000, 0x00800000,
+              0x20010000, 0x00008000, 0x0007c020}};
+        static BinaryPropertyObject property_object{OGr_Ext, codepoint_set};
     }
     namespace OIDC_ns {
         /** Code Point Ranges for OIDC
-        [00b7, 00b7], [0387, 0387], [1369, 1371], [19da, 19da]**/
-
-
-        namespace {
-        const static UnicodeSet::run_t __codepoint_set_runs[] = {
-        {Empty, 5}, {Mixed, 1}, {Empty, 22}, {Mixed, 1}, {Empty, 126},
-        {Mixed, 1}, {Empty, 50}, {Mixed, 1}, {Empty, 34609}};
-        const static UnicodeSet::bitquad_t  __codepoint_set_quads[] = {
-        0x00800000, 0x00000080, 0x0003fe00, 0x04000000};
-        }
-
-        const static UnicodeSet codepoint_set{const_cast<UnicodeSet::run_t *>(__codepoint_set_runs), 9, 0, const_cast<UnicodeSet::bitquad_t *>(__codepoint_set_quads), 4, 0};
-
-        static BinaryPropertyObject property_object{OIDC, std::move(codepoint_set)};
+        [183, 183], [903, 903], [4969, 4977], [6618, 6618]**/
+        const UnicodeSet codepoint_set 
+            {{{Empty, 5}, {Mixed, 1}, {Empty, 22}, {Mixed, 1}, {Empty, 126},
+              {Mixed, 1}, {Empty, 50}, {Mixed, 1}, {Empty, 34609}},
+             {0x00800000, 0x00000080, 0x0003fe00, 0x04000000}};
+        static BinaryPropertyObject property_object{OIDC, codepoint_set};
     }
     namespace OIDS_ns {
         /** Code Point Ranges for OIDS
-        [1885, 1886], [2118, 2118], [212e, 212e], [309b, 309c]**/
-
-
-        namespace {
-        const static UnicodeSet::run_t __codepoint_set_runs[] = {
-        {Empty, 196}, {Mixed, 1}, {Empty, 67}, {Mixed, 2}, {Empty, 122},
-        {Mixed, 1}, {Empty, 34427}};
-        const static UnicodeSet::bitquad_t  __codepoint_set_quads[] = {
-        0x00000060, 0x01000000, 0x00004000, 0x18000000};
-        }
-
-        const static UnicodeSet codepoint_set{const_cast<UnicodeSet::run_t *>(__codepoint_set_runs), 7, 0, const_cast<UnicodeSet::bitquad_t *>(__codepoint_set_quads), 4, 0};
-
-        static BinaryPropertyObject property_object{OIDS, std::move(codepoint_set)};
+        [6277, 6278], [8472, 8472], [8494, 8494], [12443, 12444]**/
+        const UnicodeSet codepoint_set 
+            {{{Empty, 196}, {Mixed, 1}, {Empty, 67}, {Mixed, 2},
+              {Empty, 122}, {Mixed, 1}, {Empty, 34427}},
+             {0x00000060, 0x01000000, 0x00004000, 0x18000000}};
+        static BinaryPropertyObject property_object{OIDS, codepoint_set};
     }
     namespace OLOWER_ns {
         /** Code Point Ranges for OLower
-        [00aa, 00aa], [00ba, 00ba], [02b0, 02b8], [02c0, 02c1],
-        [02e0, 02e4], [0345, 0345], [037a, 037a], [1d2c, 1d6a],
-        [1d78, 1d78], [1d9b, 1dbf], [2071, 2071], [207f, 207f],
-        [2090, 209c], [2170, 217f], [24d0, 24e9], [2c7c, 2c7d],
-        [a69c, a69d], [a770, a770], [a7f8, a7f9], [ab5c, ab5f]**/
-
-
-        namespace {
-        const static UnicodeSet::run_t __codepoint_set_runs[] = {
-        {Empty, 5}, {Mixed, 1}, {Empty, 15}, {Mixed, 3}, {Empty, 2},
-        {Mixed, 2}, {Empty, 205}, {Mixed, 1}, {Full, 1}, {Mixed, 2},
-        {Full, 1}, {Empty, 21}, {Mixed, 2}, {Empty, 6}, {Mixed, 1},
-        {Empty, 26}, {Mixed, 2}, {Empty, 59}, {Mixed, 1}, {Empty, 976},
-        {Mixed, 1}, {Empty, 6}, {Mixed, 1}, {Empty, 3}, {Mixed, 1},
-        {Empty, 26}, {Mixed, 1}, {Empty, 33445}};
-        const static UnicodeSet::bitquad_t  __codepoint_set_quads[] = {
-        0x04000400, 0x01ff0000, 0x00000003, 0x0000001f, 0x00000020,
-        0x04000000, 0xfffff000, 0x010007ff, 0xf8000000, 0x80020000,
-        0x1fff0000, 0xffff0000, 0xffff0000, 0x000003ff, 0x30000000,
-        0x30000000, 0x00010000, 0x03000000, 0xf0000000};
-        }
-
-        const static UnicodeSet codepoint_set{const_cast<UnicodeSet::run_t *>(__codepoint_set_runs), 28, 0, const_cast<UnicodeSet::bitquad_t *>(__codepoint_set_quads), 19, 0};
-
-        static BinaryPropertyObject property_object{OLower, std::move(codepoint_set)};
+        [170, 170], [186, 186], [688, 696], [704, 705], [736, 740],
+        [837, 837], [890, 890], [7468, 7530], [7544, 7544], [7579, 7615],
+        [8305, 8305], [8319, 8319], [8336, 8348], [8560, 8575],
+        [9424, 9449], [11388, 11389], [42652, 42653], [42864, 42864],
+        [43000, 43001], [43868, 43871]**/
+        const UnicodeSet codepoint_set 
+            {{{Empty, 5}, {Mixed, 1}, {Empty, 15}, {Mixed, 3}, {Empty, 2},
+              {Mixed, 2}, {Empty, 205}, {Mixed, 1}, {Full, 1}, {Mixed, 2},
+              {Full, 1}, {Empty, 21}, {Mixed, 2}, {Empty, 6}, {Mixed, 1},
+              {Empty, 26}, {Mixed, 2}, {Empty, 59}, {Mixed, 1},
+              {Empty, 976}, {Mixed, 1}, {Empty, 6}, {Mixed, 1}, {Empty, 3},
+              {Mixed, 1}, {Empty, 26}, {Mixed, 1}, {Empty, 33445}},
+             {0x04000400, 0x01ff0000, 0x00000003, 0x0000001f, 0x00000020,
+              0x04000000, 0xfffff000, 0x010007ff, 0xf8000000, 0x80020000,
+              0x1fff0000, 0xffff0000, 0xffff0000, 0x000003ff, 0x30000000,
+              0x30000000, 0x00010000, 0x03000000, 0xf0000000}};
+        static BinaryPropertyObject property_object{OLower, codepoint_set};
     }
     namespace OMATH_ns {
         /** Code Point Ranges for OMath
-        [005e, 005e], [03d0, 03d2], [03d5, 03d5], [03f0, 03f1],
-        [03f4, 03f5], [2016, 2016], [2032, 2034], [2040, 2040],
-        [2061, 2064], [207d, 207e], [208d, 208e], [20d0, 20dc],
-        [20e1, 20e1], [20e5, 20e6], [20eb, 20ef], [2102, 2102],
-        [2107, 2107], [210a, 2113], [2115, 2115], [2119, 211d],
-        [2124, 2124], [2128, 2129], [212c, 212d], [212f, 2131],
-        [2133, 2138], [213c, 213f], [2145, 2149], [2195, 2199],
-        [219c, 219f], [21a1, 21a2], [21a4, 21a5], [21a7, 21a7],
-        [21a9, 21ad], [21b0, 21b1], [21b6, 21b7], [21bc, 21cd],
-        [21d0, 21d1], [21d3, 21d3], [21d5, 21db], [21dd, 21dd],
-        [21e4, 21e5], [2308, 230b], [23b4, 23b5], [23b7, 23b7],
-        [23d0, 23d0], [23e2, 23e2], [25a0, 25a1], [25ae, 25b6],
-        [25bc, 25c0], [25c6, 25c7], [25ca, 25cb], [25cf, 25d3],
-        [25e2, 25e2], [25e4, 25e4], [25e7, 25ec], [2605, 2606],
-        [2640, 2640], [2642, 2642], [2660, 2663], [266d, 266e],
-        [27c5, 27c6], [27e6, 27ef], [2983, 2998], [29d8, 29db],
-        [29fc, 29fd], [fe61, fe61], [fe63, fe63], [fe68, fe68],
-        [ff3c, ff3c], [ff3e, ff3e], [1d400, 1d454], [1d456, 1d49c],
-        [1d49e, 1d49f], [1d4a2, 1d4a2], [1d4a5, 1d4a6], [1d4a9, 1d4ac],
-        [1d4ae, 1d4b9], [1d4bb, 1d4bb], [1d4bd, 1d4c3], [1d4c5, 1d505],
-        [1d507, 1d50a], [1d50d, 1d514], [1d516, 1d51c], [1d51e, 1d539],
-        [1d53b, 1d53e], [1d540, 1d544], [1d546, 1d546], [1d54a, 1d550],
-        [1d552, 1d6a5], [1d6a8, 1d6c0], [1d6c2, 1d6da], [1d6dc, 1d6fa],
-        [1d6fc, 1d714], [1d716, 1d734], [1d736, 1d74e], [1d750, 1d76e],
-        [1d770, 1d788], [1d78a, 1d7a8], [1d7aa, 1d7c2], [1d7c4, 1d7cb],
-        [1d7ce, 1d7ff], [1ee00, 1ee03], [1ee05, 1ee1f], [1ee21, 1ee22],
-        [1ee24, 1ee24], [1ee27, 1ee27], [1ee29, 1ee32], [1ee34, 1ee37],
-        [1ee39, 1ee39], [1ee3b, 1ee3b], [1ee42, 1ee42], [1ee47, 1ee47],
-        [1ee49, 1ee49], [1ee4b, 1ee4b], [1ee4d, 1ee4f], [1ee51, 1ee52],
-        [1ee54, 1ee54], [1ee57, 1ee57], [1ee59, 1ee59], [1ee5b, 1ee5b],
-        [1ee5d, 1ee5d], [1ee5f, 1ee5f], [1ee61, 1ee62], [1ee64, 1ee64],
-        [1ee67, 1ee6a], [1ee6c, 1ee72], [1ee74, 1ee77], [1ee79, 1ee7c],
-        [1ee7e, 1ee7e], [1ee80, 1ee89], [1ee8b, 1ee9b], [1eea1, 1eea3],
-        [1eea5, 1eea9], [1eeab, 1eebb]**/
-
-
-        namespace {
-        const static UnicodeSet::run_t __codepoint_set_runs[] = {
-        {Empty, 2}, {Mixed, 1}, {Empty, 27}, {Mixed, 2}, {Empty, 224},
-        {Mixed, 5}, {Empty, 1}, {Mixed, 5}, {Empty, 1}, {Mixed, 4},
-        {Empty, 8}, {Mixed, 1}, {Empty, 4}, {Mixed, 3}, {Empty, 13},
-        {Mixed, 4}, {Empty, 1}, {Mixed, 2}, {Empty, 10}, {Mixed, 2},
-        {Empty, 12}, {Mixed, 1}, {Empty, 1}, {Mixed, 2}, {Empty, 1699},
-        {Mixed, 1}, {Empty, 5}, {Mixed, 1}, {Empty, 1702}, {Full, 2},
-        {Mixed, 1}, {Full, 1}, {Mixed, 3}, {Full, 1}, {Mixed, 3},
-        {Full, 10}, {Mixed, 10}, {Full, 1}, {Empty, 176}, {Mixed, 6},
-        {Empty, 30858}};
-        const static UnicodeSet::bitquad_t  __codepoint_set_quads[] = {
-        0x40000000, 0x00270000, 0x00330000, 0x00400000, 0x001c0000,
-        0x00000001, 0x6000001e, 0x00006000, 0x1fff0000, 0x0000f862,
-        0x3e2ffc84, 0xf1fbb310, 0x000003e0, 0xf3e00000, 0xf0c33eb6,
-        0x2feb3fff, 0x00000030, 0x00000f00, 0x00b00000, 0x00010000,
-        0x00000004, 0xf07fc003, 0x000f8cc1, 0x00001f94, 0x00000060,
-        0x00000005, 0x0000600f, 0x00000060, 0x0000ffc0, 0x01fffff8,
-        0x0f000000, 0x30000000, 0x0000010a, 0x50000000, 0xffdfffff,
-        0xdfffffff, 0xebffde64, 0xffffffef, 0xdfdfe7bf, 0x7bffffff,
-        0xfffdfc5f, 0xffffff3f, 0xf7fffffd, 0xf7ffffff, 0xffdfffff,
-        0xffdfffff, 0xffff7fff, 0xffff7fff, 0xfffffdff, 0xfffffdff,
-        0xffffcff7, 0xffffffef, 0x0af7fe96, 0xaa96ea84, 0x5ef7f796,
-        0x0ffffbff, 0x0ffffbee};
-        }
-
-        const static UnicodeSet codepoint_set{const_cast<UnicodeSet::run_t *>(__codepoint_set_runs), 41, 0, const_cast<UnicodeSet::bitquad_t *>(__codepoint_set_quads), 57, 0};
-
-        static BinaryPropertyObject property_object{OMath, std::move(codepoint_set)};
+        [94, 94], [976, 978], [981, 981], [1008, 1009], [1012, 1013],
+        [8214, 8214], [8242, 8244], [8256, 8256], [8289, 8292],
+        [8317, 8318], [8333, 8334], [8400, 8412], [8417, 8417],
+        [8421, 8422], [8427, 8431], [8450, 8450], [8455, 8455],
+        [8458, 8467], [8469, 8469], [8473, 8477], [8484, 8484],
+        [8488, 8489], [8492, 8493], [8495, 8497], [8499, 8504],
+        [8508, 8511], [8517, 8521], [8597, 8601], [8604, 8607],
+        [8609, 8610], [8612, 8613], [8615, 8615], [8617, 8621],
+        [8624, 8625], [8630, 8631], [8636, 8653], [8656, 8657],
+        [8659, 8659], [8661, 8667], [8669, 8669], [8676, 8677],
+        [8968, 8971], [9140, 9141], [9143, 9143], [9168, 9168],
+        [9186, 9186], [9632, 9633], [9646, 9654], [9660, 9664],
+        [9670, 9671], [9674, 9675], [9679, 9683], [9698, 9698],
+        [9700, 9700], [9703, 9708], [9733, 9734], [9792, 9792],
+        [9794, 9794], [9824, 9827], [9837, 9838], [10181, 10182],
+        [10214, 10223], [10627, 10648], [10712, 10715], [10748, 10749],
+        [65121, 65121], [65123, 65123], [65128, 65128], [65340, 65340],
+        [65342, 65342], [119808, 119892], [119894, 119964],
+        [119966, 119967], [119970, 119970], [119973, 119974],
+        [119977, 119980], [119982, 119993], [119995, 119995],
+        [119997, 120003], [120005, 120069], [120071, 120074],
+        [120077, 120084], [120086, 120092], [120094, 120121],
+        [120123, 120126], [120128, 120132], [120134, 120134],
+        [120138, 120144], [120146, 120485], [120488, 120512],
+        [120514, 120538], [120540, 120570], [120572, 120596],
+        [120598, 120628], [120630, 120654], [120656, 120686],
+        [120688, 120712], [120714, 120744], [120746, 120770],
+        [120772, 120779], [120782, 120831], [126464, 126467],
+        [126469, 126495], [126497, 126498], [126500, 126500],
+        [126503, 126503], [126505, 126514], [126516, 126519],
+        [126521, 126521], [126523, 126523], [126530, 126530],
+        [126535, 126535], [126537, 126537], [126539, 126539],
+        [126541, 126543], [126545, 126546], [126548, 126548],
+        [126551, 126551], [126553, 126553], [126555, 126555],
+        [126557, 126557], [126559, 126559], [126561, 126562],
+        [126564, 126564], [126567, 126570], [126572, 126578],
+        [126580, 126583], [126585, 126588], [126590, 126590],
+        [126592, 126601], [126603, 126619], [126625, 126627],
+        [126629, 126633], [126635, 126651]**/
+        const UnicodeSet codepoint_set 
+            {{{Empty, 2}, {Mixed, 1}, {Empty, 27}, {Mixed, 2}, {Empty, 224},
+              {Mixed, 5}, {Empty, 1}, {Mixed, 5}, {Empty, 1}, {Mixed, 4},
+              {Empty, 8}, {Mixed, 1}, {Empty, 4}, {Mixed, 3}, {Empty, 13},
+              {Mixed, 4}, {Empty, 1}, {Mixed, 2}, {Empty, 10}, {Mixed, 2},
+              {Empty, 12}, {Mixed, 1}, {Empty, 1}, {Mixed, 2},
+              {Empty, 1699}, {Mixed, 1}, {Empty, 5}, {Mixed, 1},
+              {Empty, 1702}, {Full, 2}, {Mixed, 1}, {Full, 1}, {Mixed, 3},
+              {Full, 1}, {Mixed, 3}, {Full, 10}, {Mixed, 10}, {Full, 1},
+              {Empty, 176}, {Mixed, 6}, {Empty, 30858}},
+             {0x40000000, 0x00270000, 0x00330000, 0x00400000, 0x001c0000,
+              0x00000001, 0x6000001e, 0x00006000, 0x1fff0000, 0x0000f862,
+              0x3e2ffc84, 0xf1fbb310, 0x000003e0, 0xf3e00000, 0xf0c33eb6,
+              0x2feb3fff, 0x00000030, 0x00000f00, 0x00b00000, 0x00010000,
+              0x00000004, 0xf07fc003, 0x000f8cc1, 0x00001f94, 0x00000060,
+              0x00000005, 0x0000600f, 0x00000060, 0x0000ffc0, 0x01fffff8,
+              0x0f000000, 0x30000000, 0x0000010a, 0x50000000, 0xffdfffff,
+              0xdfffffff, 0xebffde64, 0xffffffef, 0xdfdfe7bf, 0x7bffffff,
+              0xfffdfc5f, 0xffffff3f, 0xf7fffffd, 0xf7ffffff, 0xffdfffff,
+              0xffdfffff, 0xffff7fff, 0xffff7fff, 0xfffffdff, 0xfffffdff,
+              0xffffcff7, 0xffffffef, 0x0af7fe96, 0xaa96ea84, 0x5ef7f796,
+              0x0ffffbff, 0x0ffffbee}};
+        static BinaryPropertyObject property_object{OMath, codepoint_set};
     }
     namespace OUPPER_ns {
         /** Code Point Ranges for OUpper
-        [2160, 216f], [24b6, 24cf], [1f130, 1f149], [1f150, 1f169],
-        [1f170, 1f189]**/
-
-
-        namespace {
-        const static UnicodeSet::run_t __codepoint_set_runs[] = {
-        {Empty, 267}, {Mixed, 1}, {Empty, 25}, {Mixed, 2}, {Empty, 3682},
-        {Mixed, 4}, {Empty, 30835}};
-        const static UnicodeSet::bitquad_t  __codepoint_set_quads[] = {
-        0x0000ffff, 0xffc00000, 0x0000ffff, 0xffff0000, 0xffff03ff,
-        0xffff03ff, 0x000003ff};
-        }
-
-        const static UnicodeSet codepoint_set{const_cast<UnicodeSet::run_t *>(__codepoint_set_runs), 7, 0, const_cast<UnicodeSet::bitquad_t *>(__codepoint_set_quads), 7, 0};
-
-        static BinaryPropertyObject property_object{OUpper, std::move(codepoint_set)};
+        [8544, 8559], [9398, 9423], [127280, 127305], [127312, 127337],
+        [127344, 127369]**/
+        const UnicodeSet codepoint_set 
+            {{{Empty, 267}, {Mixed, 1}, {Empty, 25}, {Mixed, 2},
+              {Empty, 3682}, {Mixed, 4}, {Empty, 30835}},
+             {0x0000ffff, 0xffc00000, 0x0000ffff, 0xffff0000, 0xffff03ff,
+              0xffff03ff, 0x000003ff}};
+        static BinaryPropertyObject property_object{OUpper, codepoint_set};
     }
     namespace PCM_ns {
         /** Code Point Ranges for PCM
-        [0600, 0605], [06dd, 06dd], [070f, 070f], [08e2, 08e2],
-        [110bd, 110bd]**/
-
-
-        namespace {
-        const static UnicodeSet::run_t __codepoint_set_runs[] = {
-        {Empty, 48}, {Mixed, 1}, {Empty, 5}, {Mixed, 1}, {Empty, 1},
-        {Mixed, 1}, {Empty, 14}, {Mixed, 1}, {Empty, 2109}, {Mixed, 1},
-        {Empty, 32634}};
-        const static UnicodeSet::bitquad_t  __codepoint_set_quads[] = {
-        0x0000003f, 0x20000000, 0x00008000, 0x00000004, 0x20000000};
-        }
-
-        const static UnicodeSet codepoint_set{const_cast<UnicodeSet::run_t *>(__codepoint_set_runs), 11, 0, const_cast<UnicodeSet::bitquad_t *>(__codepoint_set_quads), 5, 0};
-
-        static BinaryPropertyObject property_object{PCM, std::move(codepoint_set)};
+        [1536, 1541], [1757, 1757], [1807, 1807], [2274, 2274],
+        [69821, 69821]**/
+        const UnicodeSet codepoint_set 
+            {{{Empty, 48}, {Mixed, 1}, {Empty, 5}, {Mixed, 1}, {Empty, 1},
+              {Mixed, 1}, {Empty, 14}, {Mixed, 1}, {Empty, 2109},
+              {Mixed, 1}, {Empty, 32634}},
+             {0x0000003f, 0x20000000, 0x00008000, 0x00000004, 0x20000000}};
+        static BinaryPropertyObject property_object{PCM, codepoint_set};
     }
     namespace PAT_SYN_ns {
         /** Code Point Ranges for Pat_Syn
-        [0021, 002f], [003a, 0040], [005b, 005e], [0060, 0060],
-        [007b, 007e], [00a1, 00a7], [00a9, 00a9], [00ab, 00ac],
-        [00ae, 00ae], [00b0, 00b1], [00b6, 00b6], [00bb, 00bb],
-        [00bf, 00bf], [00d7, 00d7], [00f7, 00f7], [2010, 2027],
-        [2030, 203e], [2041, 2053], [2055, 205e], [2190, 245f],
-        [2500, 2775], [2794, 2bff], [2e00, 2e7f], [3001, 3003],
-        [3008, 3020], [3030, 3030], [fd3e, fd3f], [fe45, fe46]**/
-
-
-        namespace {
-        const static UnicodeSet::run_t __codepoint_set_runs[] = {
-        {Empty, 1}, {Mixed, 3}, {Empty, 1}, {Mixed, 3}, {Empty, 248},
-        {Mixed, 3}, {Empty, 9}, {Mixed, 1}, {Full, 22}, {Empty, 5},
-        {Full, 19}, {Mixed, 2}, {Full, 35}, {Empty, 16}, {Full, 4},
-        {Empty, 12}, {Mixed, 2}, {Empty, 1639}, {Mixed, 1}, {Empty, 8},
-        {Mixed, 1}, {Empty, 32781}};
-        const static UnicodeSet::bitquad_t  __codepoint_set_quads[] = {
-        0xfc00fffe, 0x78000001, 0x78000001, 0x88435afe, 0x00800000,
-        0x00800000, 0xffff0000, 0x7fff00ff, 0x7feffffe, 0xffff0000,
-        0x003fffff, 0xfff00000, 0xffffff0e, 0x00010001, 0xc0000000,
-        0x00000060};
-        }
-
-        const static UnicodeSet codepoint_set{const_cast<UnicodeSet::run_t *>(__codepoint_set_runs), 22, 0, const_cast<UnicodeSet::bitquad_t *>(__codepoint_set_quads), 16, 0};
-
-        static BinaryPropertyObject property_object{Pat_Syn, std::move(codepoint_set)};
+        [33, 47], [58, 64], [91, 94], [96, 96], [123, 126], [161, 167],
+        [169, 169], [171, 172], [174, 174], [176, 177], [182, 182],
+        [187, 187], [191, 191], [215, 215], [247, 247], [8208, 8231],
+        [8240, 8254], [8257, 8275], [8277, 8286], [8592, 9311],
+        [9472, 10101], [10132, 11263], [11776, 11903], [12289, 12291],
+        [12296, 12320], [12336, 12336], [64830, 64831], [65093, 65094]**/
+        const UnicodeSet codepoint_set 
+            {{{Empty, 1}, {Mixed, 3}, {Empty, 1}, {Mixed, 3}, {Empty, 248},
+              {Mixed, 3}, {Empty, 9}, {Mixed, 1}, {Full, 22}, {Empty, 5},
+              {Full, 19}, {Mixed, 2}, {Full, 35}, {Empty, 16}, {Full, 4},
+              {Empty, 12}, {Mixed, 2}, {Empty, 1639}, {Mixed, 1},
+              {Empty, 8}, {Mixed, 1}, {Empty, 32781}},
+             {0xfc00fffe, 0x78000001, 0x78000001, 0x88435afe, 0x00800000,
+              0x00800000, 0xffff0000, 0x7fff00ff, 0x7feffffe, 0xffff0000,
+              0x003fffff, 0xfff00000, 0xffffff0e, 0x00010001, 0xc0000000,
+              0x00000060}};
+        static BinaryPropertyObject property_object{Pat_Syn, codepoint_set};
     }
     namespace PAT_WS_ns {
         /** Code Point Ranges for Pat_WS
-        [0009, 000d], [0020, 0020], [0085, 0085], [200e, 200f],
-        [2028, 2029]**/
-
-
-        namespace {
-        const static UnicodeSet::run_t __codepoint_set_runs[] = {
-        {Mixed, 2}, {Empty, 2}, {Mixed, 1}, {Empty, 251}, {Mixed, 2},
-        {Empty, 34558}};
-        const static UnicodeSet::bitquad_t  __codepoint_set_quads[] = {
-        0x00003e00, 0x00000001, 0x00000020, 0x0000c000, 0x00000300};
-        }
-
-        const static UnicodeSet codepoint_set{const_cast<UnicodeSet::run_t *>(__codepoint_set_runs), 6, 0, const_cast<UnicodeSet::bitquad_t *>(__codepoint_set_quads), 5, 0};
-
-        static BinaryPropertyObject property_object{Pat_WS, std::move(codepoint_set)};
+        [9, 13], [32, 32], [133, 133], [8206, 8207], [8232, 8233]**/
+        const UnicodeSet codepoint_set 
+            {{{Mixed, 2}, {Empty, 2}, {Mixed, 1}, {Empty, 251}, {Mixed, 2},
+              {Empty, 34558}},
+             {0x00003e00, 0x00000001, 0x00000020, 0x0000c000, 0x00000300}};
+        static BinaryPropertyObject property_object{Pat_WS, codepoint_set};
     }
     namespace QMARK_ns {
         /** Code Point Ranges for QMark
-        [0022, 0022], [0027, 0027], [00ab, 00ab], [00bb, 00bb],
-        [2018, 201f], [2039, 203a], [2e42, 2e42], [300c, 300f],
-        [301d, 301f], [fe41, fe44], [ff02, ff02], [ff07, ff07],
-        [ff62, ff63]**/
-
-
-        namespace {
-        const static UnicodeSet::run_t __codepoint_set_runs[] = {
-        {Empty, 1}, {Mixed, 1}, {Empty, 3}, {Mixed, 1}, {Empty, 250},
-        {Mixed, 2}, {Empty, 112}, {Mixed, 1}, {Empty, 13}, {Mixed, 1},
-        {Empty, 1649}, {Mixed, 1}, {Empty, 5}, {Mixed, 1}, {Empty, 2},
-        {Mixed, 1}, {Empty, 32772}};
-        const static UnicodeSet::bitquad_t  __codepoint_set_quads[] = {
-        0x00000084, 0x08000800, 0xff000000, 0x06000000, 0x00000004,
-        0xe000f000, 0x0000001e, 0x00000084, 0x0000000c};
-        }
-
-        const static UnicodeSet codepoint_set{const_cast<UnicodeSet::run_t *>(__codepoint_set_runs), 17, 0, const_cast<UnicodeSet::bitquad_t *>(__codepoint_set_quads), 9, 0};
-
-        static BinaryPropertyObject property_object{QMark, std::move(codepoint_set)};
-    }
-    namespace RI_ns {
-        /** Code Point Ranges for RI
-        [1f1e6, 1f1ff]**/
-
-
-        namespace {
-        const static UnicodeSet::run_t __codepoint_set_runs[] = {
-        {Empty, 3983}, {Mixed, 1}, {Empty, 30832}};
-        const static UnicodeSet::bitquad_t  __codepoint_set_quads[] = {
-        0xffffffc0};
-        }
-
-        const static UnicodeSet codepoint_set{const_cast<UnicodeSet::run_t *>(__codepoint_set_runs), 3, 0, const_cast<UnicodeSet::bitquad_t *>(__codepoint_set_quads), 1, 0};
-
-        static BinaryPropertyObject property_object{RI, std::move(codepoint_set)};
+        [34, 34], [39, 39], [171, 171], [187, 187], [8216, 8223],
+        [8249, 8250], [11842, 11842], [12300, 12303], [12317, 12319],
+        [65089, 65092], [65282, 65282], [65287, 65287], [65378, 65379]**/
+        const UnicodeSet codepoint_set 
+            {{{Empty, 1}, {Mixed, 1}, {Empty, 3}, {Mixed, 1}, {Empty, 250},
+              {Mixed, 2}, {Empty, 112}, {Mixed, 1}, {Empty, 13}, {Mixed, 1},
+              {Empty, 1649}, {Mixed, 1}, {Empty, 5}, {Mixed, 1}, {Empty, 2},
+              {Mixed, 1}, {Empty, 32772}},
+             {0x00000084, 0x08000800, 0xff000000, 0x06000000, 0x00000004,
+              0xe000f000, 0x0000001e, 0x00000084, 0x0000000c}};
+        static BinaryPropertyObject property_object{QMark, codepoint_set};
     }
     namespace RADICAL_ns {
         /** Code Point Ranges for Radical
-        [2e80, 2e99], [2e9b, 2ef3], [2f00, 2fd5]**/
-
-
-        namespace {
-        const static UnicodeSet::run_t __codepoint_set_runs[] = {
-        {Empty, 372}, {Mixed, 1}, {Full, 2}, {Mixed, 1}, {Full, 6},
-        {Mixed, 1}, {Empty, 34433}};
-        const static UnicodeSet::bitquad_t  __codepoint_set_quads[] = {
-        0xfbffffff, 0x000fffff, 0x003fffff};
-        }
-
-        const static UnicodeSet codepoint_set{const_cast<UnicodeSet::run_t *>(__codepoint_set_runs), 7, 0, const_cast<UnicodeSet::bitquad_t *>(__codepoint_set_quads), 3, 0};
-
-        static BinaryPropertyObject property_object{Radical, std::move(codepoint_set)};
+        [11904, 11929], [11931, 12019], [12032, 12245]**/
+        const UnicodeSet codepoint_set 
+            {{{Empty, 372}, {Mixed, 1}, {Full, 2}, {Mixed, 1}, {Full, 6},
+              {Mixed, 1}, {Empty, 34433}},
+             {0xfbffffff, 0x000fffff, 0x003fffff}};
+        static BinaryPropertyObject property_object{Radical, codepoint_set};
     }
     namespace SD_ns {
         /** Code Point Ranges for SD
-        [0069, 006a], [012f, 012f], [0249, 0249], [0268, 0268],
-        [029d, 029d], [02b2, 02b2], [03f3, 03f3], [0456, 0456],
-        [0458, 0458], [1d62, 1d62], [1d96, 1d96], [1da4, 1da4],
-        [1da8, 1da8], [1e2d, 1e2d], [1ecb, 1ecb], [2071, 2071],
-        [2148, 2149], [2c7c, 2c7c], [1d422, 1d423], [1d456, 1d457],
-        [1d48a, 1d48b], [1d4be, 1d4bf], [1d4f2, 1d4f3], [1d526, 1d527],
-        [1d55a, 1d55b], [1d58e, 1d58f], [1d5c2, 1d5c3], [1d5f6, 1d5f7],
-        [1d62a, 1d62b], [1d65e, 1d65f], [1d692, 1d693]**/
-
-
-        namespace {
-        const static UnicodeSet::run_t __codepoint_set_runs[] = {
-        {Empty, 3}, {Mixed, 1}, {Empty, 5}, {Mixed, 1}, {Empty, 8},
-        {Mixed, 4}, {Empty, 9}, {Mixed, 1}, {Empty, 2}, {Mixed, 1},
-        {Empty, 200}, {Mixed, 3}, {Empty, 3}, {Mixed, 1}, {Empty, 4},
-        {Mixed, 1}, {Empty, 12}, {Mixed, 1}, {Empty, 6}, {Mixed, 1},
-        {Empty, 88}, {Mixed, 1}, {Empty, 3389}, {Mixed, 2}, {Empty, 1},
-        {Mixed, 2}, {Empty, 1}, {Mixed, 1}, {Empty, 1}, {Mixed, 2},
-        {Empty, 1}, {Mixed, 1}, {Empty, 1}, {Mixed, 2}, {Empty, 1},
-        {Mixed, 2}, {Empty, 1}, {Mixed, 1}, {Empty, 31051}};
-        const static UnicodeSet::bitquad_t  __codepoint_set_quads[] = {
-        0x00000600, 0x00008000, 0x00000200, 0x00000100, 0x20000000,
-        0x00040000, 0x00080000, 0x01400000, 0x00000004, 0x00400000,
-        0x00000110, 0x00002000, 0x00000800, 0x00020000, 0x00000300,
-        0x10000000, 0x0000000c, 0x00c00000, 0x00000c00, 0xc0000000,
-        0x000c0000, 0x000000c0, 0x0c000000, 0x0000c000, 0x0000000c,
-        0x00c00000, 0x00000c00, 0xc0000000, 0x000c0000};
-        }
-
-        const static UnicodeSet codepoint_set{const_cast<UnicodeSet::run_t *>(__codepoint_set_runs), 39, 0, const_cast<UnicodeSet::bitquad_t *>(__codepoint_set_quads), 29, 0};
-
-        static BinaryPropertyObject property_object{SD, std::move(codepoint_set)};
+        [105, 106], [303, 303], [585, 585], [616, 616], [669, 669],
+        [690, 690], [1011, 1011], [1110, 1110], [1112, 1112], [7522, 7522],
+        [7574, 7574], [7588, 7588], [7592, 7592], [7725, 7725],
+        [7883, 7883], [8305, 8305], [8520, 8521], [11388, 11388],
+        [119842, 119843], [119894, 119895], [119946, 119947],
+        [119998, 119999], [120050, 120051], [120102, 120103],
+        [120154, 120155], [120206, 120207], [120258, 120259],
+        [120310, 120311], [120362, 120363], [120414, 120415],
+        [120466, 120467]**/
+        const UnicodeSet codepoint_set 
+            {{{Empty, 3}, {Mixed, 1}, {Empty, 5}, {Mixed, 1}, {Empty, 8},
+              {Mixed, 4}, {Empty, 9}, {Mixed, 1}, {Empty, 2}, {Mixed, 1},
+              {Empty, 200}, {Mixed, 3}, {Empty, 3}, {Mixed, 1}, {Empty, 4},
+              {Mixed, 1}, {Empty, 12}, {Mixed, 1}, {Empty, 6}, {Mixed, 1},
+              {Empty, 88}, {Mixed, 1}, {Empty, 3389}, {Mixed, 2},
+              {Empty, 1}, {Mixed, 2}, {Empty, 1}, {Mixed, 1}, {Empty, 1},
+              {Mixed, 2}, {Empty, 1}, {Mixed, 1}, {Empty, 1}, {Mixed, 2},
+              {Empty, 1}, {Mixed, 2}, {Empty, 1}, {Mixed, 1},
+              {Empty, 31051}},
+             {0x00000600, 0x00008000, 0x00000200, 0x00000100, 0x20000000,
+              0x00040000, 0x00080000, 0x01400000, 0x00000004, 0x00400000,
+              0x00000110, 0x00002000, 0x00000800, 0x00020000, 0x00000300,
+              0x10000000, 0x0000000c, 0x00c00000, 0x00000c00, 0xc0000000,
+              0x000c0000, 0x000000c0, 0x0c000000, 0x0000c000, 0x0000000c,
+              0x00c00000, 0x00000c00, 0xc0000000, 0x000c0000}};
+        static BinaryPropertyObject property_object{SD, codepoint_set};
     }
     namespace STERM_ns {
         /** Code Point Ranges for STerm
-        [0021, 0021], [002e, 002e], [003f, 003f], [0589, 0589],
-        [061f, 061f], [06d4, 06d4], [0700, 0702], [07f9, 07f9],
-        [0964, 0965], [104a, 104b], [1362, 1362], [1367, 1368],
-        [166e, 166e], [1735, 1736], [1803, 1803], [1809, 1809],
-        [1944, 1945], [1aa8, 1aab], [1b5a, 1b5b], [1b5e, 1b5f],
-        [1c3b, 1c3c], [1c7e, 1c7f], [203c, 203d], [2047, 2049],
-        [2e2e, 2e2e], [2e3c, 2e3c], [3002, 3002], [a4ff, a4ff],
-        [a60e, a60f], [a6f3, a6f3], [a6f7, a6f7], [a876, a877],
-        [a8ce, a8cf], [a92f, a92f], [a9c8, a9c9], [aa5d, aa5f],
-        [aaf0, aaf1], [abeb, abeb], [fe52, fe52], [fe56, fe57],
-        [ff01, ff01], [ff0e, ff0e], [ff1f, ff1f], [ff61, ff61],
-        [10a56, 10a57], [11047, 11048], [110be, 110c1], [11141, 11143],
-        [111c5, 111c6], [111cd, 111cd], [111de, 111df], [11238, 11239],
-        [1123b, 1123c], [112a9, 112a9], [1144b, 1144c], [115c2, 115c3],
-        [115c9, 115d7], [11641, 11642], [1173c, 1173e], [11a42, 11a43],
-        [11a9b, 11a9c], [11c41, 11c42], [16a6e, 16a6f], [16af5, 16af5],
-        [16b37, 16b38], [16b44, 16b44], [1bc9f, 1bc9f], [1da88, 1da88]**/
-
-
-        namespace {
-        const static UnicodeSet::run_t __codepoint_set_runs[] = {
-        {Empty, 1}, {Mixed, 1}, {Empty, 42}, {Mixed, 1}, {Empty, 3},
-        {Mixed, 1}, {Empty, 5}, {Mixed, 1}, {Empty, 1}, {Mixed, 1},
-        {Empty, 6}, {Mixed, 1}, {Empty, 11}, {Mixed, 1}, {Empty, 54},
-        {Mixed, 1}, {Empty, 24}, {Mixed, 1}, {Empty, 23}, {Mixed, 1},
-        {Empty, 5}, {Mixed, 1}, {Empty, 6}, {Mixed, 1}, {Empty, 9},
-        {Mixed, 1}, {Empty, 10}, {Mixed, 1}, {Empty, 4}, {Mixed, 1},
-        {Empty, 6}, {Mixed, 1}, {Empty, 1}, {Mixed, 1}, {Empty, 29},
-        {Mixed, 2}, {Empty, 110}, {Mixed, 1}, {Empty, 14}, {Mixed, 1},
-        {Empty, 934}, {Mixed, 1}, {Empty, 8}, {Mixed, 1}, {Empty, 6},
-        {Mixed, 1}, {Empty, 11}, {Mixed, 1}, {Empty, 2}, {Mixed, 1},
-        {Empty, 2}, {Mixed, 1}, {Empty, 4}, {Mixed, 1}, {Empty, 3},
-        {Mixed, 1}, {Empty, 4}, {Mixed, 1}, {Empty, 7}, {Mixed, 1},
-        {Empty, 658}, {Mixed, 1}, {Empty, 5}, {Mixed, 1}, {Empty, 2},
-        {Mixed, 1}, {Empty, 86}, {Mixed, 1}, {Empty, 47}, {Mixed, 1},
-        {Empty, 2}, {Mixed, 2}, {Empty, 3}, {Mixed, 1}, {Empty, 3},
-        {Mixed, 1}, {Empty, 2}, {Mixed, 1}, {Empty, 3}, {Mixed, 1},
-        {Empty, 12}, {Mixed, 1}, {Empty, 11}, {Mixed, 1}, {Empty, 3},
-        {Mixed, 1}, {Empty, 6}, {Mixed, 1}, {Empty, 24}, {Mixed, 1},
-        {Empty, 1}, {Mixed, 1}, {Empty, 13}, {Mixed, 1}, {Empty, 624},
-        {Mixed, 1}, {Empty, 3}, {Mixed, 1}, {Empty, 1}, {Mixed, 2},
-        {Empty, 649}, {Mixed, 1}, {Empty, 239}, {Mixed, 1}, {Empty, 31019}};
-        const static UnicodeSet::bitquad_t  __codepoint_set_quads[] = {
-        0x80004002, 0x00000200, 0x80000000, 0x00100000, 0x00000007,
-        0x02000000, 0x00000030, 0x00000c00, 0x00000184, 0x00004000,
-        0x00600000, 0x00000208, 0x00000030, 0x00000f00, 0xcc000000,
-        0x18000000, 0xc0000000, 0x30000000, 0x00000380, 0x10004000,
-        0x00000004, 0x80000000, 0x0000c000, 0x00880000, 0x00c00000,
-        0x0000c000, 0x00008000, 0x00000300, 0xe0000000, 0x00030000,
-        0x00000800, 0x00c40000, 0x80004002, 0x00000002, 0x00c00000,
-        0x00000180, 0xc0000000, 0x00000003, 0x0000000e, 0xc0002060,
-        0x1b000000, 0x00000200, 0x00001800, 0x00fffe0c, 0x00000006,
-        0x70000000, 0x0000000c, 0x18000000, 0x00000006, 0x0000c000,
-        0x00200000, 0x01800000, 0x00000010, 0x80000000, 0x00000100};
-        }
-
-        const static UnicodeSet codepoint_set{const_cast<UnicodeSet::run_t *>(__codepoint_set_runs), 105, 0, const_cast<UnicodeSet::bitquad_t *>(__codepoint_set_quads), 55, 0};
-
-        static BinaryPropertyObject property_object{STerm, std::move(codepoint_set)};
+        [33, 33], [46, 46], [63, 63], [1417, 1417], [1567, 1567],
+        [1748, 1748], [1792, 1794], [2041, 2041], [2404, 2405],
+        [4170, 4171], [4962, 4962], [4967, 4968], [5742, 5742],
+        [5941, 5942], [6147, 6147], [6153, 6153], [6468, 6469],
+        [6824, 6827], [7002, 7003], [7006, 7007], [7227, 7228],
+        [7294, 7295], [8252, 8253], [8263, 8265], [11822, 11822],
+        [11836, 11836], [12290, 12290], [42239, 42239], [42510, 42511],
+        [42739, 42739], [42743, 42743], [43126, 43127], [43214, 43215],
+        [43311, 43311], [43464, 43465], [43613, 43615], [43760, 43761],
+        [44011, 44011], [65106, 65106], [65110, 65111], [65281, 65281],
+        [65294, 65294], [65311, 65311], [65377, 65377], [68182, 68183],
+        [69703, 69704], [69822, 69825], [69953, 69955], [70085, 70086],
+        [70093, 70093], [70110, 70111], [70200, 70201], [70203, 70204],
+        [70313, 70313], [70731, 70732], [71106, 71107], [71113, 71127],
+        [71233, 71234], [71484, 71486], [72769, 72770], [92782, 92783],
+        [92917, 92917], [92983, 92984], [92996, 92996], [113823, 113823],
+        [121480, 121480]**/
+        const UnicodeSet codepoint_set 
+            {{{Empty, 1}, {Mixed, 1}, {Empty, 42}, {Mixed, 1}, {Empty, 3},
+              {Mixed, 1}, {Empty, 5}, {Mixed, 1}, {Empty, 1}, {Mixed, 1},
+              {Empty, 6}, {Mixed, 1}, {Empty, 11}, {Mixed, 1}, {Empty, 54},
+              {Mixed, 1}, {Empty, 24}, {Mixed, 1}, {Empty, 23}, {Mixed, 1},
+              {Empty, 5}, {Mixed, 1}, {Empty, 6}, {Mixed, 1}, {Empty, 9},
+              {Mixed, 1}, {Empty, 10}, {Mixed, 1}, {Empty, 4}, {Mixed, 1},
+              {Empty, 6}, {Mixed, 1}, {Empty, 1}, {Mixed, 1}, {Empty, 29},
+              {Mixed, 2}, {Empty, 110}, {Mixed, 1}, {Empty, 14}, {Mixed, 1},
+              {Empty, 934}, {Mixed, 1}, {Empty, 8}, {Mixed, 1}, {Empty, 6},
+              {Mixed, 1}, {Empty, 11}, {Mixed, 1}, {Empty, 2}, {Mixed, 1},
+              {Empty, 2}, {Mixed, 1}, {Empty, 4}, {Mixed, 1}, {Empty, 3},
+              {Mixed, 1}, {Empty, 4}, {Mixed, 1}, {Empty, 7}, {Mixed, 1},
+              {Empty, 658}, {Mixed, 1}, {Empty, 5}, {Mixed, 1}, {Empty, 2},
+              {Mixed, 1}, {Empty, 86}, {Mixed, 1}, {Empty, 47}, {Mixed, 1},
+              {Empty, 2}, {Mixed, 2}, {Empty, 3}, {Mixed, 1}, {Empty, 3},
+              {Mixed, 1}, {Empty, 2}, {Mixed, 1}, {Empty, 3}, {Mixed, 1},
+              {Empty, 12}, {Mixed, 1}, {Empty, 11}, {Mixed, 1}, {Empty, 3},
+              {Mixed, 1}, {Empty, 6}, {Mixed, 1}, {Empty, 40}, {Mixed, 1},
+              {Empty, 624}, {Mixed, 1}, {Empty, 3}, {Mixed, 1}, {Empty, 1},
+              {Mixed, 2}, {Empty, 649}, {Mixed, 1}, {Empty, 239},
+              {Mixed, 1}, {Empty, 31019}},
+             {0x80004002, 0x00000200, 0x80000000, 0x00100000, 0x00000007,
+              0x02000000, 0x00000030, 0x00000c00, 0x00000184, 0x00004000,
+              0x00600000, 0x00000208, 0x00000030, 0x00000f00, 0xcc000000,
+              0x18000000, 0xc0000000, 0x30000000, 0x00000380, 0x10004000,
+              0x00000004, 0x80000000, 0x0000c000, 0x00880000, 0x00c00000,
+              0x0000c000, 0x00008000, 0x00000300, 0xe0000000, 0x00030000,
+              0x00000800, 0x00c40000, 0x80004002, 0x00000002, 0x00c00000,
+              0x00000180, 0xc0000000, 0x00000003, 0x0000000e, 0xc0002060,
+              0x1b000000, 0x00000200, 0x00001800, 0x00fffe0c, 0x00000006,
+              0x70000000, 0x00000006, 0x0000c000, 0x00200000, 0x01800000,
+              0x00000010, 0x80000000, 0x00000100}};
+        static BinaryPropertyObject property_object{STerm, codepoint_set};
     }
     namespace TERM_ns {
         /** Code Point Ranges for Term
-        [0021, 0021], [002c, 002c], [002e, 002e], [003a, 003b],
-        [003f, 003f], [037e, 037e], [0387, 0387], [0589, 0589],
-        [05c3, 05c3], [060c, 060c], [061b, 061b], [061f, 061f],
-        [06d4, 06d4], [0700, 070a], [070c, 070c], [07f8, 07f9],
-        [0830, 083e], [085e, 085e], [0964, 0965], [0e5a, 0e5b],
-        [0f08, 0f08], [0f0d, 0f12], [104a, 104b], [1361, 1368],
-        [166d, 166e], [16eb, 16ed], [1735, 1736], [17d4, 17d6],
-        [17da, 17da], [1802, 1805], [1808, 1809], [1944, 1945],
-        [1aa8, 1aab], [1b5a, 1b5b], [1b5d, 1b5f], [1c3b, 1c3f],
-        [1c7e, 1c7f], [203c, 203d], [2047, 2049], [2e2e, 2e2e],
-        [2e3c, 2e3c], [2e41, 2e41], [3001, 3002], [a4fe, a4ff],
-        [a60d, a60f], [a6f3, a6f7], [a876, a877], [a8ce, a8cf],
-        [a92f, a92f], [a9c7, a9c9], [aa5d, aa5f], [aadf, aadf],
-        [aaf0, aaf1], [abeb, abeb], [fe50, fe52], [fe54, fe57],
-        [ff01, ff01], [ff0c, ff0c], [ff0e, ff0e], [ff1a, ff1b],
-        [ff1f, ff1f], [ff61, ff61], [ff64, ff64], [1039f, 1039f],
-        [103d0, 103d0], [10857, 10857], [1091f, 1091f], [10a56, 10a57],
-        [10af0, 10af5], [10b3a, 10b3f], [10b99, 10b9c], [11047, 1104d],
-        [110be, 110c1], [11141, 11143], [111c5, 111c6], [111cd, 111cd],
-        [111de, 111df], [11238, 1123c], [112a9, 112a9], [1144b, 1144d],
-        [1145b, 1145b], [115c2, 115c5], [115c9, 115d7], [11641, 11642],
-        [1173c, 1173e], [11a42, 11a43], [11a9b, 11a9c], [11aa1, 11aa2],
-        [11c41, 11c43], [11c71, 11c71], [12470, 12474], [16a6e, 16a6f],
-        [16af5, 16af5], [16b37, 16b39], [16b44, 16b44], [1bc9f, 1bc9f],
-        [1da87, 1da8a]**/
-
-
-        namespace {
-        const static UnicodeSet::run_t __codepoint_set_runs[] = {
-        {Empty, 1}, {Mixed, 1}, {Empty, 25}, {Mixed, 2}, {Empty, 15},
-        {Mixed, 1}, {Empty, 1}, {Mixed, 1}, {Empty, 1}, {Mixed, 1},
-        {Empty, 5}, {Mixed, 1}, {Empty, 1}, {Mixed, 1}, {Empty, 6},
-        {Mixed, 1}, {Empty, 1}, {Mixed, 2}, {Empty, 8}, {Mixed, 1},
-        {Empty, 38}, {Mixed, 1}, {Empty, 5}, {Mixed, 1}, {Empty, 9},
-        {Mixed, 1}, {Empty, 24}, {Mixed, 1}, {Empty, 23}, {Mixed, 1},
-        {Empty, 3}, {Mixed, 1}, {Empty, 1}, {Mixed, 1}, {Empty, 4},
-        {Mixed, 1}, {Empty, 1}, {Mixed, 1}, {Empty, 9}, {Mixed, 1},
-        {Empty, 10}, {Mixed, 1}, {Empty, 4}, {Mixed, 1}, {Empty, 6},
-        {Mixed, 1}, {Empty, 1}, {Mixed, 1}, {Empty, 29}, {Mixed, 2},
-        {Empty, 110}, {Mixed, 2}, {Empty, 13}, {Mixed, 1}, {Empty, 934},
-        {Mixed, 1}, {Empty, 8}, {Mixed, 1}, {Empty, 6}, {Mixed, 1},
-        {Empty, 11}, {Mixed, 1}, {Empty, 2}, {Mixed, 1}, {Empty, 2},
-        {Mixed, 1}, {Empty, 4}, {Mixed, 1}, {Empty, 3}, {Mixed, 1},
-        {Empty, 3}, {Mixed, 2}, {Empty, 7}, {Mixed, 1}, {Empty, 658},
-        {Mixed, 1}, {Empty, 5}, {Mixed, 1}, {Empty, 2}, {Mixed, 1},
-        {Empty, 32}, {Mixed, 1}, {Empty, 1}, {Mixed, 1}, {Empty, 35},
-        {Mixed, 1}, {Empty, 5}, {Mixed, 1}, {Empty, 9}, {Mixed, 1},
-        {Empty, 4}, {Mixed, 1}, {Empty, 1}, {Mixed, 1}, {Empty, 2},
-        {Mixed, 1}, {Empty, 37}, {Mixed, 1}, {Empty, 2}, {Mixed, 2},
-        {Empty, 3}, {Mixed, 1}, {Empty, 3}, {Mixed, 1}, {Empty, 2},
-        {Mixed, 1}, {Empty, 3}, {Mixed, 1}, {Empty, 12}, {Mixed, 1},
-        {Empty, 11}, {Mixed, 1}, {Empty, 3}, {Mixed, 1}, {Empty, 6},
-        {Mixed, 1}, {Empty, 24}, {Mixed, 1}, {Empty, 1}, {Mixed, 2},
-        {Empty, 12}, {Mixed, 2}, {Empty, 63}, {Mixed, 1}, {Empty, 559},
-        {Mixed, 1}, {Empty, 3}, {Mixed, 1}, {Empty, 1}, {Mixed, 2},
-        {Empty, 649}, {Mixed, 1}, {Empty, 239}, {Mixed, 1}, {Empty, 31019}};
-        const static UnicodeSet::bitquad_t  __codepoint_set_quads[] = {
-        0x8c005002, 0x40000000, 0x00000080, 0x00000200, 0x00000008,
-        0x88001000, 0x00100000, 0x000017ff, 0x03000000, 0x7fff0000,
-        0x40000000, 0x00000030, 0x0c000000, 0x0007e100, 0x00000c00,
-        0x000001fe, 0x00006000, 0x00003800, 0x00600000, 0x04700000,
-        0x0000033c, 0x00000030, 0x00000f00, 0xec000000, 0xf8000000,
-        0xc0000000, 0x30000000, 0x00000380, 0x10004000, 0x00000002,
-        0x00000006, 0xc0000000, 0x0000e000, 0x00f80000, 0x00c00000,
-        0x0000c000, 0x00008000, 0x00000380, 0xe0000000, 0x80000000,
-        0x00030000, 0x00000800, 0x00f70000, 0x8c005002, 0x00000012,
-        0x80000000, 0x00010000, 0x00800000, 0x80000000, 0x00c00000,
-        0x003f0000, 0xfc000000, 0x1e000000, 0x00003f80, 0xc0000000,
-        0x00000003, 0x0000000e, 0xc0002060, 0x1f000000, 0x00000200,
-        0x08003800, 0x00fffe3c, 0x00000006, 0x70000000, 0x0000000c,
-        0x18000000, 0x00000006, 0x0000000e, 0x00020000, 0x001f0000,
-        0x0000c000, 0x00200000, 0x03800000, 0x00000010, 0x80000000,
-        0x00000780};
-        }
-
-        const static UnicodeSet codepoint_set{const_cast<UnicodeSet::run_t *>(__codepoint_set_runs), 135, 0, const_cast<UnicodeSet::bitquad_t *>(__codepoint_set_quads), 76, 0};
-
-        static BinaryPropertyObject property_object{Term, std::move(codepoint_set)};
+        [33, 33], [44, 44], [46, 46], [58, 59], [63, 63], [894, 894],
+        [903, 903], [1417, 1417], [1475, 1475], [1548, 1548], [1563, 1563],
+        [1567, 1567], [1748, 1748], [1792, 1802], [1804, 1804],
+        [2040, 2041], [2096, 2110], [2142, 2142], [2404, 2405],
+        [3674, 3675], [3848, 3848], [3853, 3858], [4170, 4171],
+        [4961, 4968], [5741, 5742], [5867, 5869], [5941, 5942],
+        [6100, 6102], [6106, 6106], [6146, 6149], [6152, 6153],
+        [6468, 6469], [6824, 6827], [7002, 7003], [7005, 7007],
+        [7227, 7231], [7294, 7295], [8252, 8253], [8263, 8265],
+        [11822, 11822], [11836, 11836], [11841, 11841], [12289, 12290],
+        [42238, 42239], [42509, 42511], [42739, 42743], [43126, 43127],
+        [43214, 43215], [43311, 43311], [43463, 43465], [43613, 43615],
+        [43743, 43743], [43760, 43761], [44011, 44011], [65104, 65106],
+        [65108, 65111], [65281, 65281], [65292, 65292], [65294, 65294],
+        [65306, 65307], [65311, 65311], [65377, 65377], [65380, 65380],
+        [66463, 66463], [66512, 66512], [67671, 67671], [67871, 67871],
+        [68182, 68183], [68336, 68341], [68410, 68415], [68505, 68508],
+        [69703, 69709], [69822, 69825], [69953, 69955], [70085, 70086],
+        [70093, 70093], [70110, 70111], [70200, 70204], [70313, 70313],
+        [70731, 70733], [70747, 70747], [71106, 71109], [71113, 71127],
+        [71233, 71234], [71484, 71486], [72769, 72771], [72817, 72817],
+        [74864, 74868], [92782, 92783], [92917, 92917], [92983, 92985],
+        [92996, 92996], [113823, 113823], [121479, 121482]**/
+        const UnicodeSet codepoint_set 
+            {{{Empty, 1}, {Mixed, 1}, {Empty, 25}, {Mixed, 2}, {Empty, 15},
+              {Mixed, 1}, {Empty, 1}, {Mixed, 1}, {Empty, 1}, {Mixed, 1},
+              {Empty, 5}, {Mixed, 1}, {Empty, 1}, {Mixed, 1}, {Empty, 6},
+              {Mixed, 1}, {Empty, 1}, {Mixed, 2}, {Empty, 8}, {Mixed, 1},
+              {Empty, 38}, {Mixed, 1}, {Empty, 5}, {Mixed, 1}, {Empty, 9},
+              {Mixed, 1}, {Empty, 24}, {Mixed, 1}, {Empty, 23}, {Mixed, 1},
+              {Empty, 3}, {Mixed, 1}, {Empty, 1}, {Mixed, 1}, {Empty, 4},
+              {Mixed, 1}, {Empty, 1}, {Mixed, 1}, {Empty, 9}, {Mixed, 1},
+              {Empty, 10}, {Mixed, 1}, {Empty, 4}, {Mixed, 1}, {Empty, 6},
+              {Mixed, 1}, {Empty, 1}, {Mixed, 1}, {Empty, 29}, {Mixed, 2},
+              {Empty, 110}, {Mixed, 2}, {Empty, 13}, {Mixed, 1},
+              {Empty, 934}, {Mixed, 1}, {Empty, 8}, {Mixed, 1}, {Empty, 6},
+              {Mixed, 1}, {Empty, 11}, {Mixed, 1}, {Empty, 2}, {Mixed, 1},
+              {Empty, 2}, {Mixed, 1}, {Empty, 4}, {Mixed, 1}, {Empty, 3},
+              {Mixed, 1}, {Empty, 3}, {Mixed, 2}, {Empty, 7}, {Mixed, 1},
+              {Empty, 658}, {Mixed, 1}, {Empty, 5}, {Mixed, 1}, {Empty, 2},
+              {Mixed, 1}, {Empty, 32}, {Mixed, 1}, {Empty, 1}, {Mixed, 1},
+              {Empty, 35}, {Mixed, 1}, {Empty, 5}, {Mixed, 1}, {Empty, 9},
+              {Mixed, 1}, {Empty, 4}, {Mixed, 1}, {Empty, 1}, {Mixed, 1},
+              {Empty, 2}, {Mixed, 1}, {Empty, 37}, {Mixed, 1}, {Empty, 2},
+              {Mixed, 2}, {Empty, 3}, {Mixed, 1}, {Empty, 3}, {Mixed, 1},
+              {Empty, 2}, {Mixed, 1}, {Empty, 3}, {Mixed, 1}, {Empty, 12},
+              {Mixed, 1}, {Empty, 11}, {Mixed, 1}, {Empty, 3}, {Mixed, 1},
+              {Empty, 6}, {Mixed, 1}, {Empty, 40}, {Mixed, 2}, {Empty, 63},
+              {Mixed, 1}, {Empty, 559}, {Mixed, 1}, {Empty, 3}, {Mixed, 1},
+              {Empty, 1}, {Mixed, 2}, {Empty, 649}, {Mixed, 1},
+              {Empty, 239}, {Mixed, 1}, {Empty, 31019}},
+             {0x8c005002, 0x40000000, 0x00000080, 0x00000200, 0x00000008,
+              0x88001000, 0x00100000, 0x000017ff, 0x03000000, 0x7fff0000,
+              0x40000000, 0x00000030, 0x0c000000, 0x0007e100, 0x00000c00,
+              0x000001fe, 0x00006000, 0x00003800, 0x00600000, 0x04700000,
+              0x0000033c, 0x00000030, 0x00000f00, 0xec000000, 0xf8000000,
+              0xc0000000, 0x30000000, 0x00000380, 0x10004000, 0x00000002,
+              0x00000006, 0xc0000000, 0x0000e000, 0x00f80000, 0x00c00000,
+              0x0000c000, 0x00008000, 0x00000380, 0xe0000000, 0x80000000,
+              0x00030000, 0x00000800, 0x00f70000, 0x8c005002, 0x00000012,
+              0x80000000, 0x00010000, 0x00800000, 0x80000000, 0x00c00000,
+              0x003f0000, 0xfc000000, 0x1e000000, 0x00003f80, 0xc0000000,
+              0x00000003, 0x0000000e, 0xc0002060, 0x1f000000, 0x00000200,
+              0x08003800, 0x00fffe3c, 0x00000006, 0x70000000, 0x0000000e,
+              0x00020000, 0x001f0000, 0x0000c000, 0x00200000, 0x03800000,
+              0x00000010, 0x80000000, 0x00000780}};
+        static BinaryPropertyObject property_object{Term, codepoint_set};
     }
     namespace UIDEO_ns {
         /** Code Point Ranges for UIdeo
-        [3400, 4db5], [4e00, 9fea], [fa0e, fa0f], [fa11, fa11],
-        [fa13, fa14], [fa1f, fa1f], [fa21, fa21], [fa23, fa24],
-        [fa27, fa29], [20000, 2a6d6], [2a700, 2b734], [2b740, 2b81d],
-        [2b820, 2cea1], [2ceb0, 2ebe0]**/
-
-
-        namespace {
-        const static UnicodeSet::run_t __codepoint_set_runs[] = {
-        {Empty, 416}, {Full, 205}, {Mixed, 1}, {Empty, 2}, {Full, 655},
-        {Mixed, 1}, {Empty, 720}, {Mixed, 2}, {Empty, 2094}, {Full, 1334},
-        {Mixed, 1}, {Empty, 1}, {Full, 129}, {Mixed, 1}, {Full, 6},
-        {Mixed, 1}, {Full, 180}, {Mixed, 1}, {Full, 233}, {Mixed, 1},
-        {Empty, 28832}};
-        const static UnicodeSet::bitquad_t  __codepoint_set_quads[] = {
-        0x003fffff, 0x000007ff, 0x801ac000, 0x0000039a, 0x007fffff,
-        0x001fffff, 0x3fffffff, 0xffff0003, 0x00000001};
-        }
-
-        const static UnicodeSet codepoint_set{const_cast<UnicodeSet::run_t *>(__codepoint_set_runs), 21, 0, const_cast<UnicodeSet::bitquad_t *>(__codepoint_set_quads), 9, 0};
-
-        static BinaryPropertyObject property_object{UIdeo, std::move(codepoint_set)};
+        [13312, 19893], [19968, 40917], [64014, 64015], [64017, 64017],
+        [64019, 64020], [64031, 64031], [64033, 64033], [64035, 64036],
+        [64039, 64041], [131072, 173782], [173824, 177972],
+        [177984, 178205], [178208, 183969]**/
+        const UnicodeSet codepoint_set 
+            {{{Empty, 416}, {Full, 205}, {Mixed, 1}, {Empty, 2},
+              {Full, 654}, {Mixed, 1}, {Empty, 721}, {Mixed, 2},
+              {Empty, 2094}, {Full, 1334}, {Mixed, 1}, {Empty, 1},
+              {Full, 129}, {Mixed, 1}, {Full, 6}, {Mixed, 1}, {Full, 180},
+              {Mixed, 1}, {Empty, 29066}},
+             {0x003fffff, 0x003fffff, 0x801ac000, 0x0000039a, 0x007fffff,
+              0x001fffff, 0x3fffffff, 0x00000003}};
+        static BinaryPropertyObject property_object{UIdeo, codepoint_set};
     }
     namespace VS_ns {
         /** Code Point Ranges for VS
-        [180b, 180d], [fe00, fe0f], [e0100, e01ef]**/
-
-
-        namespace {
-        const static UnicodeSet::run_t __codepoint_set_runs[] = {
-        {Empty, 192}, {Mixed, 1}, {Empty, 1839}, {Mixed, 1}, {Empty, 26647},
-        {Full, 7}, {Mixed, 1}, {Empty, 6128}};
-        const static UnicodeSet::bitquad_t  __codepoint_set_quads[] = {
-        0x00003800, 0x0000ffff, 0x0000ffff};
-        }
-
-        const static UnicodeSet codepoint_set{const_cast<UnicodeSet::run_t *>(__codepoint_set_runs), 8, 0, const_cast<UnicodeSet::bitquad_t *>(__codepoint_set_quads), 3, 0};
-
-        static BinaryPropertyObject property_object{VS, std::move(codepoint_set)};
+        [6155, 6157], [65024, 65039], [917760, 917999]**/
+        const UnicodeSet codepoint_set 
+            {{{Empty, 192}, {Mixed, 1}, {Empty, 1839}, {Mixed, 1},
+              {Empty, 26647}, {Full, 7}, {Mixed, 1}, {Empty, 6128}},
+             {0x00003800, 0x0000ffff, 0x0000ffff}};
+        static BinaryPropertyObject property_object{VS, codepoint_set};
     }
     namespace WSPACE_ns {
         /** Code Point Ranges for WSpace
-        [0009, 000d], [0020, 0020], [0085, 0085], [00a0, 00a0],
-        [1680, 1680], [2000, 200a], [2028, 2029], [202f, 202f],
-        [205f, 205f], [3000, 3000]**/
-
-
-        namespace {
-        const static UnicodeSet::run_t __codepoint_set_runs[] = {
-        {Mixed, 2}, {Empty, 2}, {Mixed, 2}, {Empty, 174}, {Mixed, 1},
-        {Empty, 75}, {Mixed, 3}, {Empty, 125}, {Mixed, 1}, {Empty, 34431}};
-        const static UnicodeSet::bitquad_t  __codepoint_set_quads[] = {
-        0x00003e00, 0x00000001, 0x00000020, 0x00000001, 0x00000001,
-        0x000007ff, 0x00008300, 0x80000000, 0x00000001};
-        }
-
-        const static UnicodeSet codepoint_set{const_cast<UnicodeSet::run_t *>(__codepoint_set_runs), 10, 0, const_cast<UnicodeSet::bitquad_t *>(__codepoint_set_quads), 9, 0};
-
-        static BinaryPropertyObject property_object{WSpace, std::move(codepoint_set)};
+        [9, 13], [32, 32], [133, 133], [160, 160], [5760, 5760],
+        [8192, 8202], [8232, 8233], [8239, 8239], [8287, 8287],
+        [12288, 12288]**/
+        const UnicodeSet codepoint_set 
+            {{{Mixed, 2}, {Empty, 2}, {Mixed, 2}, {Empty, 174}, {Mixed, 1},
+              {Empty, 75}, {Mixed, 3}, {Empty, 125}, {Mixed, 1},
+              {Empty, 34431}},
+             {0x00003e00, 0x00000001, 0x00000020, 0x00000001, 0x00000001,
+              0x000007ff, 0x00008300, 0x80000000, 0x00000001}};
+        static BinaryPropertyObject property_object{WSpace, codepoint_set};
     }
 }
 

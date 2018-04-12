@@ -74,10 +74,6 @@ inline void Rep::setUB(const int ub) {
 }
 
 RE * makeRep(RE * re, const int lower_bound, const int upper_bound);
-    
-RE * unrollFirst(Rep * re);
-
-RE * unrollLast(Rep * re);
 
 }
 

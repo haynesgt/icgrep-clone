@@ -21,24 +21,21 @@ public:
         , Any
         , Assertion
         , CC
-        , Range
         , Diff
         , End
         , Intersect
         , Name
-        , Group
+        , Permute
         , Rep
         , Seq
         , Start
+        , SymDiff
+        , Union
     };
     inline ClassTypeId getClassTypeId() const {
         return mClassTypeId;
     }
-    inline static void Reset() {
-        mAllocator.Reset();
-    }
     typedef std::initializer_list<RE *> InitializerList;
-
 protected:
     inline RE(const ClassTypeId id)
     : mClassTypeId(id) {
@@ -48,18 +45,12 @@ protected:
         return mAllocator.allocate<uint8_t>(size);
     }
     const ClassTypeId mClassTypeId;
+
     static Allocator mAllocator;
 };
 
 class Vector : public RE, public std::vector<RE*, RE::VectorAllocator> {
 public:
-    static inline bool classof(const RE * re) {
-        const auto typeId = re->getClassTypeId();
-        return typeId == ClassTypeId::Alt || typeId == ClassTypeId::Seq;
-    }
-    static inline bool classof(const void *) {
-        return false;
-    }
     virtual ~Vector() {}
 protected:
     inline Vector(const ClassTypeId id)

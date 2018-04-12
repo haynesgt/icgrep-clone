@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2018 International Characters.
+ *  Copyright (c) 2016 International Characters.
  *  This software is licensed to the public under the Open Software License 3.0.
  */
 
@@ -11,96 +11,78 @@
 #include <pablo/pe_zeroes.h>        // for Zeroes
 #include <cc/cc_compiler.h>
 #include <pablo/builder.hpp>
-#include <IR_Gen/idisa_builder.h>
 #include <kernels/kernel_builder.h>
-
-#include <llvm/Support/raw_ostream.h>
 
 using namespace cc;
 using namespace kernel;
 using namespace pablo;
 using namespace re;
 using namespace llvm;
-using namespace IDISA;
 
-LineFeedKernelBuilder::LineFeedKernelBuilder(const std::unique_ptr<kernel::KernelBuilder> & b, Binding && inputStreamSet)
-: PabloKernel(b, "lf" + std::to_string(getNumOfStreams(inputStreamSet.getType())) + "x" + std::to_string(getStreamFieldWidth(inputStreamSet.getType())),
-// input
-{inputStreamSet},
-{Binding{b->getStreamSetTy(1), "lf"}}),
-    mNumOfStreams(getNumOfStreams(inputStreamSet.getType())),
-    mStreamFieldWidth(getStreamFieldWidth(inputStreamSet.getType()))
-{
-}
-
-void LineFeedKernelBuilder::generatePabloMethod() {
-    PabloBuilder pb(getEntryScope());
-    std::unique_ptr<CC_Compiler> ccc;
-    if (mNumOfStreams == 1) {
-        ccc = make_unique<cc::Direct_CC_Compiler>(getEntryScope(), pb.createExtract(getInput(0), pb.getInteger(0)));
-    } else {
-        ccc = make_unique<cc::Parabix_CC_Compiler>(getEntryScope(), getInputStreamSet("basis"));
-    }
-    PabloAST * LF = ccc->compileCC("LF", makeByte(0x0A), pb);
-    pb.createAssign(pb.createExtract(getOutput(0), 0), LF);
-}
-
-LineBreakKernelBuilder::LineBreakKernelBuilder(const std::unique_ptr<kernel::KernelBuilder> & b, const unsigned basisBitsCount)
-: PabloKernel(b, "lb" + std::to_string(basisBitsCount),
-// inputs
-{Binding{b->getStreamSetTy(basisBitsCount), "basis", FixedRate(), Principal()}
-,Binding{b->getStreamSetTy(1), "lf", FixedRate(), LookAhead(1)}},
-// outputs
-{Binding{b->getStreamSetTy(1), "linebreak", FixedRate()}
-,Binding{b->getStreamSetTy(1), "cr+lf"}}) {
+LineBreakKernelBuilder::LineBreakKernelBuilder(const std::unique_ptr<kernel::KernelBuilder> & b, unsigned basisBitsCount)
+: PabloKernel(b, "lb", {Binding{b->getStreamSetTy(basisBitsCount), "basis"}}, {Binding{b->getStreamSetTy(1), "linebreak", Add1()}}) {
 
 }
 
 void LineBreakKernelBuilder::generatePabloMethod() {
-    PabloBuilder pb(getEntryScope());
-    cc::Parabix_CC_Compiler ccc(getEntryScope(), getInputStreamSet("basis"));
 
-    Integer * const ZERO = pb.getInteger(0);
+    CC_Compiler ccc(this, getInput(0));
+    auto & pb = ccc.getBuilder();
 
-    PabloAST * const LF = pb.createExtract(getInput(1), ZERO, "LF");
-    PabloAST * const CR = ccc.compileCC(makeByte(0x0D));
-    PabloAST * const LF_VT_FF_CR = ccc.compileCC("LF,VT,FF,CR", makeByte(0x0A, 0x0D), pb);
-    Var * const LineBreak = pb.createVar("LineBreak", LF_VT_FF_CR);
+    PabloAST * LineBreak = nullptr;
+    PabloAST * LF = ccc.compileCC("LF", makeCC(0x0A), pb);
+    PabloAST * CR = ccc.compileCC(makeCC(0x0D));
+    PabloAST * LF_VT_FF_CR = ccc.compileCC(makeCC(0x0A, 0x0D));
 
-    // Remove the CR of any CR+LF
-    Var * const CRLF = pb.createVar("CRLF", pb.createZeroes());
-    auto crb = pb.createScope();
+    Zeroes * const zero = pb.createZeroes();
+    Var * crlf = pb.createVar("crlf", zero);
+    PabloBuilder crb = PabloBuilder::Create(pb);
+#ifndef USE_LOOKAHEAD_CRLF
+    PabloAST * cr1 = crb.createAdvance(CR, 1, "cr1");
+    crb.createAssign(crlf, crb.createAnd(cr1, LF));
+#else
+    PabloAST * lookaheadLF = crb.createLookahead(LF, 1, "lookaheadLF");
+    crb.createAssign(crlf, crb.createAnd(CR, lookaheadLF));
+#endif
     pb.createIf(CR, crb);
-    PabloAST * const lookaheadLF = crb.createLookahead(LF, 1, "lookaheadLF");
-    PabloAST * const crlf = crb.createAnd(CR, lookaheadLF);
-    crb.createAssign(CRLF, crlf);
-    PabloAST * removedCRLF = crb.createAnd(LineBreak, crb.createNot(CRLF));
-    crb.createAssign(LineBreak, removedCRLF);
 
+    Var * NEL_LS_PS = pb.createVar("NEL_LS_PS", zero);
 
-    // Record the CR marker of any CR+LF
-    pb.createAssign(pb.createExtract(getOutput(1), ZERO), CRLF);
-
-    // Check for Unicode Line Breaks
-    PabloAST * u8pfx = ccc.compileCC(makeByte(0xC0, 0xFF));
-    auto it = pb.createScope();
+    PabloAST * u8pfx = ccc.compileCC(makeCC(0xC0, 0xFF));
+    PabloBuilder it = PabloBuilder::Create(pb);
     pb.createIf(u8pfx, it);
-    PabloAST * u8pfx2 = ccc.compileCC(makeByte(0xC2, 0xDF), it);
-    PabloAST * u8pfx3 = ccc.compileCC(makeByte(0xE0, 0xEF), it);
+    PabloAST * u8pfx2 = ccc.compileCC(makeCC(0xC2, 0xDF), it);
+    PabloAST * u8pfx3 = ccc.compileCC(makeCC(0xE0, 0xEF), it);
 
+    //
     // Two-byte sequences
-    auto it2 = it.createScope();
+    Var * NEL = it.createVar("NEL", zero);
+    PabloBuilder it2 = PabloBuilder::Create(it);
+    it2.createAssign(NEL, it2.createAnd(it2.createAdvance(ccc.compileCC(makeCC(0xC2), it2), 1), ccc.compileCC(makeCC(0x85), it2)));
     it.createIf(u8pfx2, it2);
-    PabloAST * NEL = it2.createAnd(it2.createAdvance(ccc.compileCC(makeByte(0xC2), it2), 1), ccc.compileCC(makeByte(0x85), it2), "NEL");
-    it2.createAssign(LineBreak, it2.createOr(LineBreak, NEL));
 
+    //
     // Three-byte sequences
-    auto it3 = it.createScope();
+    Var * LS_PS = it.createVar("LS_PS", zero);
+    PabloBuilder it3 = PabloBuilder::Create(it);
     it.createIf(u8pfx3, it3);
-    PabloAST * E2_80 = it3.createAnd(it3.createAdvance(ccc.compileCC(makeByte(0xE2), it3), 1), ccc.compileCC(makeByte(0x80), it3));
-    PabloAST * LS_PS = it3.createAnd(it3.createAdvance(E2_80, 1), ccc.compileCC(makeByte(0xA8,0xA9), it3), "LS_PS");
-    it3.createAssign(LineBreak, it3.createOr(LineBreak, LS_PS));
+    PabloAST * E2_80 = it3.createAnd(it3.createAdvance(ccc.compileCC(makeCC(0xE2), it3), 1), ccc.compileCC(makeCC(0x80), it3));
+    it3.createAssign(LS_PS, it3.createAnd(it3.createAdvance(E2_80, 1), ccc.compileCC(makeCC(0xA8,0xA9), it3)));
+    it.createAssign(NEL_LS_PS, it.createOr(NEL, LS_PS));
 
-    PabloAST * unterminatedLineAtEOF = pb.createAtEOF(pb.createAdvance(pb.createNot(LineBreak), 1), "unterminatedLineAtEOF");
-    pb.createAssign(pb.createExtract(getOutput(0), ZERO), pb.createOr(LineBreak, unterminatedLineAtEOF, "EOL"));
+    PabloAST * LB_chars = pb.createOr(LF_VT_FF_CR, NEL_LS_PS);
+    PabloAST * lb = nullptr;
+    if (AlgorithmOptionIsSet(DisableUnicodeLineBreak)) {
+        lb = LF;
+    } else {
+        lb = pb.createAnd(LB_chars, pb.createNot(crlf));  // count the CR, but not CRLF
+    }
+
+    PabloAST * unterminatedLineAtEOF = pb.createAtEOF(pb.createAdvance(pb.createNot(LB_chars), 1));
+    LineBreak = pb.createOr(lb, unterminatedLineAtEOF);
+    PabloAST * const r = pb.createExtract(getOutput(0), pb.getInteger(0));
+    pb.createAssign(r, LineBreak);
+#ifdef USE_LOOKAHEAD_CRLF
+    setLookAhead(1);
+#endif
 }

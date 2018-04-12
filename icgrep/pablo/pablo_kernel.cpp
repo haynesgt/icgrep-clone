@@ -11,18 +11,22 @@
 #include <pablo/pe_ones.h>
 #include <pablo/pablo_toolchain.h>
 #include <kernels/kernel_builder.h>
-#include <kernels/streamset.h>
 #include <llvm/IR/Module.h>
-
-#include <pablo/branch.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <llvm/Support/raw_ostream.h>
 
 using namespace kernel;
 using namespace parabix;
 using namespace IDISA;
 using namespace llvm;
+
+inline bool isStreamType(const Type * ty) {
+    if (ty->isArrayTy()) {
+        ty = ty->getArrayElementType();
+    }
+    if (ty->isVectorTy()) {
+        return (ty->getVectorNumElements() == 0);
+    }
+    return false;
+}
 
 namespace pablo {
 
@@ -33,19 +37,6 @@ Var * PabloKernel::getInputStreamVar(const std::string & name) {
     return mInputs[index];
 }
 
-std::vector<PabloAST *> PabloKernel::getInputStreamSet(const std::string & name) {
-    Port port; unsigned index;
-    std::tie(port, index) = getStreamPort(name);
-    assert (port == Port::Input);
-    auto numStreams = mStreamSetInputBuffers[index]->getNumOfStreams();
-    std::vector<PabloAST *> inputSet(numStreams);
-    for (unsigned i = 0; i < numStreams; i++) {
-        inputSet[i] = mEntryScope->createExtract(mInputs[index], mEntryScope->getInteger(i));
-    }
-    return inputSet;
-}
-
-
 Var * PabloKernel::getOutputStreamVar(const std::string & name) {
     Port port; unsigned index;
     std::tie(port, index) = getStreamPort(name);
@@ -54,15 +45,47 @@ Var * PabloKernel::getOutputStreamVar(const std::string & name) {
 }
 
 Var * PabloKernel::getOutputScalarVar(const std::string & name) {
-    for (Var * out : mScalarOutputVars) {
-        if (out->getName().equals(name)) {
-            return out;
-        }
+    const auto f = mScalarOutputNameMap.find(name);
+    if (LLVM_UNLIKELY(f == mScalarOutputNameMap.end())) {
+        report_fatal_error("Kernel does not contain scalar: " + name);
     }
-    report_fatal_error("Kernel does not contain scalar " + name);
+    return f->second;
 }
 
-Var * PabloKernel::makeVariable(const String * name, Type * const type) {
+Var * PabloKernel::addInput(const std::string & name, Type * const type) {
+    Var * param = new (mAllocator) Var(makeName(name), type, mAllocator, Var::KernelInputParameter);
+    param->addUser(this);
+    mInputs.push_back(param);
+    mVariables.push_back(param);
+    if (isStreamType(type)) {
+        mStreamMap.emplace(name, std::make_pair(Port::Input, mStreamSetInputs.size()));
+        mStreamSetInputs.emplace_back(type, name);        
+    } else {
+        mScalarInputs.emplace_back(type, name);
+        param->setScalar();
+    }
+    assert (mStreamSetInputs.size() + mScalarInputs.size() == mInputs.size());
+    return param;
+}
+
+Var * PabloKernel::addOutput(const std::string & name, Type * const type) {
+    Var * result = new (mAllocator) Var(makeName(name), type, mAllocator, Var::KernelOutputParameter);
+    result->addUser(this);
+    mOutputs.push_back(result);
+    mVariables.push_back(result);
+    if (isStreamType(type)) {
+        mStreamMap.emplace(name, std::make_pair(Port::Output, mStreamSetOutputs.size()));
+        mStreamSetOutputs.emplace_back(type, name);
+    } else {
+        mScalarOutputs.emplace_back(type, name);
+        mScalarOutputNameMap.emplace(name, result);
+        result->setScalar();
+    }
+    assert (mStreamSetOutputs.size() + mScalarOutputs.size() == mOutputs.size());
+    return result;
+}
+
+Var * PabloKernel::makeVariable(String * name, Type * const type) {
     Var * const var = new (mAllocator) Var(name, type, mAllocator);
     mVariables.push_back(var);
     return var;
@@ -96,38 +119,15 @@ Ones * PabloKernel::getAllOnesValue(Type * type) {
     return value;
 }
 
-void PabloKernel::addInternalKernelProperties(const std::unique_ptr<kernel::KernelBuilder> & b) {
-    mSizeTy = b->getSizeTy();
-    mStreamTy = b->getStreamTy();
-    mSymbolTable = new SymbolGenerator(b->getContext(), mAllocator);
-    mEntryScope = new (mAllocator) PabloBlock(this, mAllocator);
-    mContext = &b->getContext();
-    for (const Binding & ss : mStreamSetInputs) {
-        Var * param = new (mAllocator) Var(makeName(ss.getName()), ss.getType(), mAllocator, Var::KernelInputParameter);
-        param->addUser(this);
-        mInputs.push_back(param);
-        mVariables.push_back(param);
-    }
-    for (const Binding & ss : mStreamSetOutputs) {
-        Var * result = new (mAllocator) Var(makeName(ss.getName()), ss.getType(), mAllocator, Var::KernelOutputParameter);
-        result->addUser(this);
-        mOutputs.push_back(result);
-        mVariables.push_back(result);
-    }
-    for (const Binding & ss : mScalarOutputs) {
-        Var * result = new (mAllocator) Var(makeName(ss.getName()), ss.getType(), mAllocator, Var::KernelOutputParameter);
-        result->addUser(this);
-        mOutputs.push_back(result);
-        mVariables.push_back(result);
-        mScalarOutputVars.push_back(result);
-        result->setScalar();
-    }
+void PabloKernel::prepareKernel(const std::unique_ptr<kernel::KernelBuilder> & iBuilder) {
+    mSizeTy = iBuilder->getSizeTy();
+    mStreamTy = iBuilder->getStreamTy();
     generatePabloMethod();    
     pablo_function_passes(this);
-    mPabloCompiler = new PabloCompiler(this);
-    mPabloCompiler->initializeKernelData(b);
+    mPabloCompiler->initializeKernelData(iBuilder);
     mSizeTy = nullptr;
-    mStreamTy = nullptr;   
+    mStreamTy = nullptr;
+    BlockOrientedKernel::prepareKernel(iBuilder);
 }
 
 void PabloKernel::generateDoBlockMethod(const std::unique_ptr<KernelBuilder> & iBuilder) {
@@ -137,12 +137,6 @@ void PabloKernel::generateDoBlockMethod(const std::unique_ptr<KernelBuilder> & i
     mSizeTy = nullptr;
     mStreamTy = nullptr;
 }
-
-#if 0
-void PabloKernel::beginConditionalRegion(const std::unique_ptr<KernelBuilder> & b) {
-    mPabloCompiler->clearCarryData(b);
-}
-#endif
 
 void PabloKernel::generateFinalBlockMethod(const std::unique_ptr<KernelBuilder> & iBuilder, Value * const remainingBytes) {
     // Standard Pablo convention for final block processing: set a bit marking
@@ -154,39 +148,6 @@ void PabloKernel::generateFinalBlockMethod(const std::unique_ptr<KernelBuilder> 
 
 void PabloKernel::generateFinalizeMethod(const std::unique_ptr<kernel::KernelBuilder> & iBuilder) {
     mPabloCompiler->releaseKernelData(iBuilder);
-
-    if (CompileOptionIsSet(PabloCompilationFlags::EnableProfiling)) {
-
-
-        Value * fd = iBuilder->CreateOpenCall(iBuilder->GetString("./" + getName() + ".profile"),
-                                              iBuilder->getInt32(O_WRONLY | O_CREAT | O_TRUNC),
-                                              iBuilder->getInt32(S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH));
-
-        Function * dprintf = iBuilder->GetDprintf();
-
-
-
-        Value * profile = iBuilder->getScalarFieldPtr("profile");
-
-
-        unsigned branchCount = 0;
-
-        for (const auto bb : mPabloCompiler->mBasicBlock) {
-
-            std::string tmp;
-            raw_string_ostream str(tmp);
-            str << "%lu\t";
-            str << bb->getName();
-            str << "\n";
-
-            Value * taken = iBuilder->CreateLoad(iBuilder->CreateGEP(profile, {iBuilder->getInt32(0), iBuilder->getInt32(branchCount++)}));
-            iBuilder->CreateCall(dprintf, {fd, iBuilder->GetString(str.str()), taken});
-
-        }
-
-        iBuilder->CreateCloseCall(fd);
-    }
-
 }
 
 String * PabloKernel::makeName(const llvm::StringRef & prefix) const {
@@ -201,14 +162,11 @@ llvm::IntegerType * PabloKernel::getInt1Ty() const {
     return IntegerType::getInt1Ty(getModule()->getContext());
 }
 
-static inline std::string && annotateKernelNameWithDebugFlags(std::string && name) {
+static inline std::string annotateKernelNameWithDebugFlags(std::string && name) {
     if (DebugOptionIsSet(DumpTrace)) {
         name += "_DumpTrace";
     }
-    if (CompileOptionIsSet(EnableProfiling)) {
-        name += "_BranchProfiling";
-    }
-    return std::move(name);
+    return name;
 }
 
 PabloKernel::PabloKernel(const std::unique_ptr<KernelBuilder> & b,
@@ -222,13 +180,32 @@ PabloKernel::PabloKernel(const std::unique_ptr<KernelBuilder> & b,
                       std::move(scalar_parameters), std::move(scalar_outputs),
                       {Binding{b->getBitBlockType(), "EOFbit"}, Binding{b->getBitBlockType(), "EOFmask"}})
 , PabloAST(PabloAST::ClassTypeId::Kernel, nullptr, mAllocator)
-, mPabloCompiler(nullptr)
-, mSymbolTable(nullptr)
-, mEntryScope(nullptr)
+, mPabloCompiler(new PabloCompiler(this))
+, mSymbolTable(new SymbolGenerator(b->getContext(), mAllocator))
+, mEntryBlock(PabloBlock::Create(this))
 , mSizeTy(nullptr)
-, mStreamTy(nullptr)
-, mContext(nullptr) {
-
+, mStreamTy(nullptr) {
+    prepareStreamSetNameMap();
+    for (const Binding & ss : mStreamSetInputs) {
+        Var * param = new (mAllocator) Var(makeName(ss.name), ss.type, mAllocator, Var::KernelInputParameter);
+        param->addUser(this);
+        mInputs.push_back(param);
+        mVariables.push_back(param);
+    }
+    for (const Binding & ss : mStreamSetOutputs) {
+        Var * result = new (mAllocator) Var(makeName(ss.name), ss.type, mAllocator, Var::KernelOutputParameter);
+        result->addUser(this);
+        mOutputs.push_back(result);
+        mVariables.push_back(result);
+    }
+    for (const Binding & ss : mScalarOutputs) {
+        Var * result = new (mAllocator) Var(makeName(ss.name), ss.type, mAllocator, Var::KernelOutputParameter);
+        result->addUser(this);
+        mOutputs.push_back(result);
+        mVariables.push_back(result);
+        mScalarOutputNameMap.emplace(ss.name, result);
+        result->setScalar();
+    }
 }
 
 PabloKernel::~PabloKernel() {

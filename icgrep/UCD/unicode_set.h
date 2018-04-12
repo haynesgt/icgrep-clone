@@ -1,7 +1,5 @@
 #ifndef UNICODE_SET_H
 #define UNICODE_SET_H
-
-#include "UCD_Config.h"
 #include <stdint.h>
 #include <vector>
 #include <boost/iterator/iterator_facade.hpp>
@@ -31,31 +29,40 @@
 // Default: 64 codepoints (k=6).
 //
 
-namespace llvm { class raw_ostream; }
-namespace re { class RE; }
+namespace llvm {
+class raw_ostream;
+}
 
 namespace UCD {
+
+typedef unsigned codepoint_t;
+enum : codepoint_t { UNICODE_MAX = 0x10FFFF };
 
 enum run_type_t : uint16_t {Empty, Mixed, Full};
 
 class UnicodeSet {
-    friend class re::RE;
-    template<typename RunVector, typename QuadVector> friend void assign(UnicodeSet *, const RunVector &, const QuadVector &) noexcept;
 public:
 
     using bitquad_t = uint32_t;
     using length_t = uint16_t;
-    using size_type = size_t;
-
     using run_t = std::pair<run_type_t, length_t>;
     using quad_iterator_return_t = std::pair<run_t, bitquad_t>;
+
+    using interval_t = std::pair<codepoint_t, codepoint_t>;
+
+    using RunVector = std::vector<run_t, ProxyAllocator<run_t>>;
+    using QuadVector = std::vector<bitquad_t, ProxyAllocator<bitquad_t>>;
+    using RunIterator = RunVector::const_iterator;
+    using QuadIterator = QuadVector::const_iterator;
+
+    using size_type = RunVector::size_type;
 
     class iterator : public boost::iterator_facade<iterator, interval_t, boost::forward_traversal_tag, interval_t> {
         friend class UnicodeSet;
         friend class boost::iterator_core_access;
     protected:
 
-        iterator(const run_t * const runIterator, const bitquad_t * const quadIterator, const codepoint_t baseCodePoint)
+        iterator(const RunVector::const_iterator runIterator, const QuadVector::const_iterator quadIterator, const codepoint_t baseCodePoint)
         : mRunIterator(runIterator), mQuadIterator(quadIterator)
         , mMixedRunIndex(0), mQuadOffset(0), mBaseCodePoint(baseCodePoint), mMinCodePoint(baseCodePoint), mMaxCodePoint(baseCodePoint) {
 
@@ -75,8 +82,8 @@ public:
             return (mMinCodePoint == other.mMinCodePoint);
         }
     private:
-        const run_t *       mRunIterator;
-        const bitquad_t *   mQuadIterator;
+        RunIterator         mRunIterator;
+        QuadIterator        mQuadIterator;
         unsigned            mMixedRunIndex;
         bitquad_t           mQuadOffset;
         codepoint_t         mBaseCodePoint;
@@ -86,101 +93,63 @@ public:
 
     inline iterator begin() const {
         // note: preincrement forces the iterator to advance onto and capture the first interval.
-        return ++iterator(mRuns, mQuads, 0);
+        return ++iterator(mRuns.cbegin(), mQuads.cbegin(), 0);
     }
 
     inline iterator end() const {
-        return iterator(mRuns, mQuads, UNICODE_MAX+1);
+        return iterator(mRuns.cend(), mQuads.cend(), 0x110000);
     }
 
-    bool empty() const { // The set has no members
-        return (mRunLength == 1) && mRuns->first == Empty;
-    }
+    bool contains(const codepoint_t codepoint) const;
 
-    bool full() const {  // The set has the full set of possible Unicode codepoints.
-        return (mRunLength == 1) && mRuns->first == Full;
-    }
-    
-    codepoint_t at(const size_type k) const; // return the k-th codepoint (or throw an error if it doesn't exist)
+    bool intersects(const codepoint_t lo, const codepoint_t hi) const;
 
-    bool contains(const codepoint_t codepoint) const noexcept;
-
-    bool intersects(const codepoint_t lo, const codepoint_t hi) const noexcept;
-    
-    bool intersects(const UnicodeSet & other) const noexcept;
-
-    bool subset(const UnicodeSet & other) const noexcept;
-    
     void insert(const codepoint_t cp);
-
-    void insert(const UnicodeSet & other) noexcept;
-
-    void invert() noexcept;
 
     void insert_range(const codepoint_t lo, const codepoint_t hi);
 
-    size_type size() const noexcept; // number of intervals in this set
+    bool empty() const;
 
-    size_type count() const noexcept; // number of codepoints in this set
+    size_type size() const;
 
-    interval_t front() const noexcept;
+    interval_t front() const;
 
-    interval_t back() const noexcept;
+    interval_t back() const;
 
-    void print(llvm::raw_ostream & out) const noexcept;
+    void dump(llvm::raw_ostream & out) const;
 
-    void dump(llvm::raw_ostream & out) const noexcept;
+    UnicodeSet operator~() const;
+    UnicodeSet operator&(const UnicodeSet & other) const;
+    UnicodeSet operator+(const UnicodeSet & other) const;
+    UnicodeSet operator-(const UnicodeSet & other) const;
+    UnicodeSet operator^(const UnicodeSet & other) const;
 
-    UnicodeSet operator~() const noexcept;
-    UnicodeSet operator&(const UnicodeSet & other) const noexcept;
-    UnicodeSet operator+(const UnicodeSet & other) const noexcept;
-    UnicodeSet operator-(const UnicodeSet & other) const noexcept;
-    UnicodeSet operator^(const UnicodeSet & other) const noexcept;
-    
-    // The subset of a UnicodeSet consisting of the isolated codepoints only, i.e.,
-    // those codepoints cp such that neither cp-1 nor cp+1 is a member of the set.
-    UnicodeSet isolates () const noexcept;
+    inline UnicodeSet & operator=(const UnicodeSet & other) = default;
+    inline UnicodeSet & operator=(UnicodeSet && other) = default;
+    bool operator==(const UnicodeSet & other) const;
+    bool operator<(const UnicodeSet & other) const;
 
-    UnicodeSet & operator=(const UnicodeSet & other) noexcept;
-    UnicodeSet & operator=(const UnicodeSet && other) noexcept;
-    bool operator==(const UnicodeSet & other) const noexcept;
-    bool operator<(const UnicodeSet & other) const noexcept;
+    UnicodeSet();
+    UnicodeSet(const codepoint_t codepoint);
+    UnicodeSet(const codepoint_t lo, const codepoint_t hi);
+    UnicodeSet(const UnicodeSet & other);
+    UnicodeSet(std::initializer_list<run_t> r, std::initializer_list<bitquad_t> q);
+    UnicodeSet(std::initializer_list<interval_t>::iterator begin, std::initializer_list<interval_t>::iterator end);
+    UnicodeSet(const std::vector<interval_t>::iterator begin, const std::vector<interval_t>::iterator end);
 
-    UnicodeSet() noexcept;
-    UnicodeSet(const codepoint_t codepoint) noexcept;
-    UnicodeSet(const codepoint_t lo, const codepoint_t hi) noexcept;
-    UnicodeSet(const UnicodeSet & other) noexcept;
-    UnicodeSet(const UnicodeSet && other) noexcept;
-
-    UnicodeSet(const std::vector<interval_t>::iterator begin, const std::vector<interval_t>::iterator end) noexcept;
-    UnicodeSet(std::initializer_list<interval_t>::iterator begin, std::initializer_list<interval_t>::iterator end) noexcept;
-    UnicodeSet(run_t * const runs, const uint32_t runLength, const uint32_t runCapacity, bitquad_t * const quads, const uint32_t quadLength, const uint32_t quadCapacity) noexcept;
-
-    UnicodeSet(std::initializer_list<run_t> r, std::initializer_list<bitquad_t> q) noexcept;
-
-    inline static void Reset() {
-        GlobalAllocator.Reset();
-    }
+    inline void swap(UnicodeSet & other);
+    inline void swap(UnicodeSet && other);
 
 protected:
+
+    UnicodeSet(std::vector<run_t> && r, std::vector<bitquad_t> && q);
 
     class quad_iterator : public boost::iterator_facade<quad_iterator, quad_iterator_return_t, boost::random_access_traversal_tag, quad_iterator_return_t> {
         friend class UnicodeSet;
         friend class boost::iterator_core_access;
     public:
-        explicit quad_iterator(const run_t * const runIterator, const run_t * const runEnd, const bitquad_t * const quadIterator, const bitquad_t * const quadEnd, const run_type_t type, const length_t remaining)
-        : mRunIterator(runIterator)
-        , mRunEnd(runEnd)
-        , mQuadIterator(quadIterator)
-        #ifndef NDEBUG
-        , mQuadEnd(quadEnd)
-        #endif
-        , mType(type)
-        , mRemaining(remaining) {
-            assert (type == Empty || type == Mixed || type == Full);
-            assert (remaining > 0 || type == Empty);
-            assert (remaining <= ((UNICODE_MAX+1) / (sizeof(bitquad_t) * 8)));
-        }
+        quad_iterator(RunIterator runIterator, QuadIterator quadIterator)
+            : mRunIterator(runIterator), mQuadIterator(quadIterator), mOffset(0) {}
 
         void advance(unsigned n);
 
@@ -193,56 +162,50 @@ protected:
         }
 
         inline run_type_t type() const {
-            return mType;
+            return mRunIterator->first;
         }
 
         inline length_t length() const {
-            return mRemaining;
+            return mRunIterator->second - mOffset;
         }
 
         inline bitquad_t quad() const {
-            assert (mQuadIterator != mQuadEnd);
             return *mQuadIterator;
         }
 
         inline bool equal(const quad_iterator & other) const {
-            const auto r = (mRunIterator == other.mRunIterator) && (mRemaining == other.mRemaining);
-            assert (!r || (mQuadIterator == other.mQuadIterator));
-            return r;
+            return (mRunIterator == other.mRunIterator) && (mQuadIterator == other.mQuadIterator);
         }
 
     private:
-        const run_t *           mRunIterator;
-        const run_t * const     mRunEnd;
-        const bitquad_t *       mQuadIterator;
-        #ifndef NDEBUG
-        const bitquad_t * const mQuadEnd;
-        #endif
-        run_type_t              mType;
-        length_t                mRemaining;
+        RunIterator     mRunIterator;
+        QuadIterator    mQuadIterator;
+        unsigned        mOffset;
     };
 
     inline quad_iterator quad_begin() const {
-        return quad_iterator(mRuns, mRuns + mRunLength, mQuads, mQuads + mQuadLength, std::get<0>(*mRuns), std::get<1>(*mRuns));
+        return quad_iterator(mRuns.cbegin(), mQuads.cbegin());
     }
 
-    inline quad_iterator quad_end() const {       
-        return quad_iterator(mRuns + mRunLength, mRuns + mRunLength, mQuads + mQuadLength, mQuads + mQuadLength, Empty, 0);
+    inline quad_iterator quad_end() const {
+        return quad_iterator(mRuns.cend(), mQuads.cend());
     }
 
 private:
 
-    run_t *                 mRuns;
-    bitquad_t *             mQuads;
-
-    uint32_t                mRunLength;
-    uint32_t                mQuadLength;
-
-    uint32_t                mRunCapacity;
-    uint32_t                mQuadCapacity;
-
-    static SlabAllocator<>  GlobalAllocator;
+    RunVector               mRuns;
+    QuadVector              mQuads;
+    static SlabAllocator<>  mAllocator;
 };
+
+
+inline void UnicodeSet::swap(UnicodeSet & other) {
+    mRuns.swap(other.mRuns); mQuads.swap(other.mQuads);
+}
+
+inline void UnicodeSet::swap(UnicodeSet && other) {
+    mRuns.swap(other.mRuns); mQuads.swap(other.mQuads);
+}
 
 }
 

@@ -77,7 +77,6 @@ def start_element_do_test(name, attrs):
 		regexp = None
 		datafile = None
 		expected_count = None
-		flags = None
 		for a in attrs:
 			if a == 'regexp':
 				regexp = attrs[a]
@@ -85,14 +84,11 @@ def start_element_do_test(name, attrs):
 				datafile = attrs[a]
 			elif a == 'grepcount':
 				expected_count = attrs[a]
-			elif a == 'flags':
-				flags = attrs[a]
 		if regexp == None or datafile == None or expected_count == None:
 			print("Bad grepcase: missing regexp and/or datafile attributes.")
 			return
-		if flags == None: flags = "-c" # Our default is counting if flags not set explicitly
 		#execute grep test
-                grep_cmd = "%s %s '%s' %s" % (grep_program_under_test, flags, escape_quotes(regexp), os.path.join(options.datafile_dir, datafile))
+                grep_cmd = "%s -c '%s' %s" % (grep_program_under_test, escape_quotes(regexp), os.path.join(options.datafile_dir, datafile))
                 if options.verbose:
                     print("Doing: " + grep_cmd)
 		try:
@@ -102,7 +98,7 @@ def start_element_do_test(name, attrs):
 		if len(grep_out) > 0 and grep_out[-1] == '\n': grep_out = grep_out[:-1]
 		m = re.search('[0-9]+', grep_out)
 		if m == None or m.group(0) != expected_count:
-			print("Test failure: {%s} expecting {%s} got {%s}" % (grep_cmd, expected_count, grep_out))
+			print("Test failure: regexp {%s} on datafile {%s} expecting {%s} got {%s}" % (regexp, datafile, expected_count, grep_out))
                         failure_count += 1
 		else:
 			if options.verbose:

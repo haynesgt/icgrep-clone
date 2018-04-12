@@ -18,13 +18,16 @@ using namespace pablo;
 using namespace llvm;
 
 void U8U32KernelBuilder::generatePabloMethod() {
-    PabloBuilder main(getEntryScope());
-    
     //  input: 8 basis bit streams
-    std::vector<PabloAST *> u8_bits = getInputStreamSet("u8bit");
+    
+    const auto u8bitSet = this->getInputStreamVar("u8bit");
+    
     //  output: 32 u8-indexed streams, + delmask stream + error stream
     
-    cc::Parabix_CC_Compiler ccc(getEntryScope(), u8_bits);
+    cc::CC_Compiler ccc(this, u8bitSet);
+    
+    PabloBuilder & main = ccc.getBuilder();
+    const auto u8_bits = ccc.getBasisBits();
     
     Zeroes * zeroes = main.createZeroes();
 
@@ -49,30 +52,30 @@ void U8U32KernelBuilder::generatePabloMethod() {
     Var * delmask = main.createVar("delmask", zeroes);
     Var * error_mask = main.createVar("error_mask", zeroes);
     
-    PabloAST * ASCII = ccc.compileCC("ASCII", re::makeByte(0x0, 0x7F), main);
-    auto ascii = main.createScope();
+    PabloAST * ASCII = ccc.compileCC("ASCII", re::makeCC(0x0, 0x7F), main);
+    PabloBuilder ascii = PabloBuilder::Create(main);
     for (int i = 1; i <= 7; i++) {
         ascii.createAssign(u32_2[i], ascii.createOr(u32_2[i], ascii.createAnd(ASCII, u8_bits[i])));
     }
     main.createIf(ASCII, ascii);
     
-    PabloAST * u8pfx = ccc.compileCC("u8pfx", re::makeByte(0xC0, 0xFF), main);
-    PabloAST * nonASCII = ccc.compileCC("u8pfx", re::makeByte(0x80, 0xFF), main);
-    auto it = main.createScope();
+    PabloAST * u8pfx = ccc.compileCC("u8pfx", re::makeCC(0xC0, 0xFF), main);
+    PabloAST * nonASCII = ccc.compileCC("u8pfx", re::makeCC(0x80, 0xFF), main);
+    PabloBuilder it = PabloBuilder::Create(main);
     main.createIf(nonASCII, it);
     
     Var * u8invalid = it.createVar("u8invalid", zeroes);
-    PabloAST * u8pfx2 = ccc.compileCC(re::makeByte(0xC2, 0xDF), it);
-    PabloAST * u8pfx3 = ccc.compileCC(re::makeByte(0xE0, 0xEF), it);
-    PabloAST * u8pfx4 = ccc.compileCC(re::makeByte(0xF0, 0xF4), it);
-    PabloAST * u8suffix = ccc.compileCC("u8suffix", re::makeByte(0x80, 0xBF), it);
+    PabloAST * u8pfx2 = ccc.compileCC(re::makeCC(0xC2, 0xDF), it);
+    PabloAST * u8pfx3 = ccc.compileCC(re::makeCC(0xE0, 0xEF), it);
+    PabloAST * u8pfx4 = ccc.compileCC(re::makeCC(0xF0, 0xF4), it);
+    PabloAST * u8suffix = ccc.compileCC("u8suffix", re::makeCC(0x80, 0xBF), it);
     
     // 
     
     //
     // Two-byte sequences
     Var * u8scope22 = it.createVar("u8scope22", zeroes);
-    auto it2 = it.createScope();
+    PabloBuilder it2 = PabloBuilder::Create(it);
     it.createIf(u8pfx2, it2);
     it2.createAssign(u8scope22, it2.createAdvance(u8pfx2, 1));
     //PabloAST * u8scope22 = it2.createAdvance(u8pfx2, 1, "u8scope22");
@@ -91,14 +94,14 @@ void U8U32KernelBuilder::generatePabloMethod() {
     Var * EX_invalid = it.createVar("EX_invalid", zeroes);
     Var * del3 = it.createVar("del3", zeroes);
 
-    auto it3 = it.createScope();
+    PabloBuilder it3 = PabloBuilder::Create(it);
     it.createIf(u8pfx3, it3);
     
     PabloAST * u8scope32 = it3.createAdvance(u8pfx3, 1, "u8scope32");
     PabloAST * u8scope33 = it3.createAdvance(u8scope32, 1, "u8scope33");
     it3.createAssign(u8scope3X, it3.createOr(u8scope32, u8scope33));
-    PabloAST * E0_invalid = it3.createAnd(it3.createAdvance(ccc.compileCC(re::makeByte(0xE0), it3), 1), ccc.compileCC(re::makeByte(0x80, 0x9F), it3));
-    PabloAST * ED_invalid = it3.createAnd(it3.createAdvance(ccc.compileCC(re::makeByte(0xED), it3), 1), ccc.compileCC(re::makeByte(0xA0, 0xBF), it3));
+    PabloAST * E0_invalid = it3.createAnd(it3.createAdvance(ccc.compileCC(re::makeCC(0xE0), it3), 1), ccc.compileCC(re::makeCC(0x80, 0x9F), it3));
+    PabloAST * ED_invalid = it3.createAnd(it3.createAdvance(ccc.compileCC(re::makeCC(0xED), it3), 1), ccc.compileCC(re::makeCC(0xA0, 0xBF), it3));
     it3.createAssign(EX_invalid, it3.createOr(E0_invalid, ED_invalid));
     
     for (int i = 2; i <= 7; i++) {
@@ -121,7 +124,7 @@ void U8U32KernelBuilder::generatePabloMethod() {
     Var * FX_invalid = it.createVar("FX_invalid", zeroes);
     Var * del4 = it.createVar("del4", zeroes);
     
-    auto it4 = it.createScope();
+    PabloBuilder it4 = PabloBuilder::Create(it);
     it.createIf(u8pfx4, it4);
     PabloAST * u8scope42 = it4.createAdvance(u8pfx4, 1, "u8scope42");
     PabloAST * u8scope43 = it4.createAdvance(u8scope42, 1, "u8scope43");
@@ -130,8 +133,8 @@ void U8U32KernelBuilder::generatePabloMethod() {
     
     it4.createAssign(u8scope4nonfinal, it4.createOr(u8scope42, u8scope43));
     it4.createAssign(u8scope4X, it4.createOr(u8scope4nonfinal, u8scope44));
-    PabloAST * F0_invalid = it4.createAnd(it4.createAdvance(ccc.compileCC(re::makeByte(0xF0), it4), 1), ccc.compileCC(re::makeByte(0x80, 0x8F), it4));
-    PabloAST * F4_invalid = it4.createAnd(it4.createAdvance(ccc.compileCC(re::makeByte(0xF4), it4), 1), ccc.compileCC(re::makeByte(0x90, 0xBF), it4));
+    PabloAST * F0_invalid = it4.createAnd(it4.createAdvance(ccc.compileCC(re::makeCC(0xF0), it4), 1), ccc.compileCC(re::makeCC(0x80, 0x8F), it4));
+    PabloAST * F4_invalid = it4.createAnd(it4.createAdvance(ccc.compileCC(re::makeCC(0xF4), it4), 1), ccc.compileCC(re::makeCC(0x90, 0xBF), it4));
     it4.createAssign(FX_invalid, it4.createOr(F0_invalid, F4_invalid));
 
 
@@ -168,7 +171,7 @@ void U8U32KernelBuilder::generatePabloMethod() {
     //PabloAST * u8valid = it.createNot(u8invalid, "u8valid");
     it.createAssign(error_mask, u8invalid);
     
-    it.createAssign(delmask, it.createOr(it.createOr(del3, del4), ccc.compileCC(re::makeByte(0xC0, 0xFF), it)));
+    it.createAssign(delmask, it.createOr(it.createOr(del3, del4), ccc.compileCC(re::makeCC(0xC0, 0xFF), it)));
     
     Var * output = this->getOutputStreamVar("u32bit");
     Var * delmask_out = this->getOutputStreamVar("delMask");

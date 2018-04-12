@@ -13,7 +13,7 @@ class Branch : public Statement {
     friend class Simplifier;
 public:
     using EscapedVars = std::vector<Var *>;
-    static bool classof(const PabloAST * e) {
+    static inline bool classof(const PabloAST * e) {
         switch (e->getClassTypeId()) {
             case ClassTypeId::If:
             case ClassTypeId::While:
@@ -22,23 +22,20 @@ public:
                 return false;
         }
     }
-    static bool classof(const void *) {
+    static inline bool classof(const void *) {
         return false;
     }
-    PabloAST * getCondition() const {
+    inline PabloAST * getCondition() const {
         return getOperand(0);
     }
-    void setCondition(PabloAST * const condition) {
+    inline void setCondition(PabloAST * const condition) {
         return setOperand(0, condition);
     }
-    PabloBlock * getBody() const {
+    inline PabloBlock * getBody() {
         return mBody;
     }
-    bool isRegular() const {
-        return mRegular;
-    }
-    void setRegular(const bool value) {
-        mRegular = value;
+    inline  PabloBlock * getBody() const {
+        return mBody;
     }
     PabloBlock * setBody(PabloBlock * const body);
     EscapedVars getEscaped() const;
@@ -51,7 +48,6 @@ protected:
     unsigned        mEscapedCount;
     unsigned        mEscapedCapacity;
     PabloAST **     mEscaped;
-    bool            mRegular;
 };
 
 class If final : public Branch {

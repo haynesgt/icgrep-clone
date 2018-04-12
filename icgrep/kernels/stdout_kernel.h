@@ -15,7 +15,7 @@ class StdOutKernel final : public MultiBlockKernel {
 public:
     StdOutKernel(const std::unique_ptr<kernel::KernelBuilder> & iBuilder, unsigned codeUnitWidth);
 private:
-    void generateMultiBlockLogic(const std::unique_ptr<KernelBuilder> & iBuilder, llvm::Value * const numOfStrides) override;
+    void generateMultiBlockLogic(const std::unique_ptr<KernelBuilder> & iBuilder) override;
 private:
     const unsigned mCodeUnitWidth;
     
@@ -26,8 +26,7 @@ public:
     FileSink(const std::unique_ptr<kernel::KernelBuilder> & iBuilder, unsigned codeUnitWidth);
 protected:
     void generateInitializeMethod(const std::unique_ptr<KernelBuilder> & iBuilder) override;
-    void generateMultiBlockLogic(const std::unique_ptr<KernelBuilder> & iBuilder, llvm::Value * const numOfStrides) override;
-    void generateFinalizeMethod(const std::unique_ptr<KernelBuilder> & b) override;
+    void generateMultiBlockLogic(const std::unique_ptr<KernelBuilder> & iBuilder) override;
 private:
     const unsigned mCodeUnitWidth;
     

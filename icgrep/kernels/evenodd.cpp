@@ -19,6 +19,7 @@ void EvenOddKernel::generateDoBlockMethod(const std::unique_ptr<KernelBuilder> &
 
 EvenOddKernel::EvenOddKernel(const std::unique_ptr<kernel::KernelBuilder> & builder)
 : BlockOrientedKernel("EvenOdd", {Binding{builder->getStreamSetTy(8, 1), "BasisBits"}}, {Binding{builder->getStreamSetTy(2, 1), "even_odd"}}, {}, {}, {}) {
+    setNoTerminateAttribute(true);
 
 }
 

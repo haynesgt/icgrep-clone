@@ -114,7 +114,7 @@ void CarryManager::initializeCarryData(const std::unique_ptr<kernel::KernelBuild
 
     assert (mKernel == nullptr);
 
-    mCurrentScope = kernel->getEntryScope();
+    mCurrentScope = kernel->getEntryBlock();
     mKernel = kernel;
 
     Type * const carryTy = iBuilder->getBitBlockType();
@@ -124,11 +124,13 @@ void CarryManager::initializeCarryData(const std::unique_ptr<kernel::KernelBuild
 
     mCarryScopes = 0;
     mCarryMetadata.resize(getScopeCount(mCurrentScope));
-    mCarryGroup.resize(assignDefaultCarryGroups(kernel->getEntryScope()));
+    mCarryGroup.resize(assignDefaultCarryGroups(kernel->getEntryBlock()));
 
-    kernel->setCarryDataTy(analyse(iBuilder, mCurrentScope));
+    Type * const carryStateTy = analyse(iBuilder, kernel->getEntryBlock());
 
-    kernel->addScalar(kernel->getCarryDataTy(), "carries");
+    kernel->addScalar(carryStateTy, "carries");
+
+//    iBuilder->CallPrintInt("carry state size:", ConstantExpr::getSizeOf(carryStateTy));
 
     if (mHasLoop) {
         kernel->addScalar(iBuilder->getInt32Ty(), "selector");
@@ -451,8 +453,10 @@ void CarryManager::leaveLoopBody(const std::unique_ptr<kernel::KernelBuilder> & 
 
         iBuilder->SetInsertPoint(resume);
 
-        iBuilder->CreateAssertZero(iBuilder->CreateOr(finalBorrow, finalCarry),
-                                   "CarryPackManager: loop post-condition violated: final borrow and carry must be zero!");
+        if (codegen::EnableAsserts) {
+            iBuilder->CreateAssertZero(iBuilder->CreateOr(finalBorrow, finalCarry),
+                                       "CarryPackManager: loop post-condition violated: final borrow and carry must be zero!");
+        }
 
         assert (!mLoopIndicies.empty());
         PHINode * index = mLoopIndicies.back();
@@ -621,35 +625,6 @@ Value * CarryManager::advanceCarryInCarryOut(const std::unique_ptr<kernel::Kerne
         return longAdvanceCarryInCarryOut(iBuilder, value, shiftAmount);
     }
 }
-
-
-/** ------------------------------------------------------------------------------------------------------------- *
- * @brief indexedAdvanceCarryInCarryOut
- ** ------------------------------------------------------------------------------------------------------------- */
-Value * CarryManager::indexedAdvanceCarryInCarryOut(const std::unique_ptr<kernel::KernelBuilder> & b, const IndexedAdvance * const advance, Value * const strm, Value * const index_strm) {
-    const auto shiftAmount = advance->getAmount();
-    if (LLVM_LIKELY(shiftAmount < mElementWidth)) {
-        Value * const carryIn = getNextCarryIn(b);
-        Value * carryOut, * result;
-        std::tie(carryOut, result) = b->bitblock_indexed_advance(strm, index_strm, carryIn, shiftAmount);
-        setNextCarryOut(b, carryOut);
-        return result;
-    } else if (shiftAmount <= b->getBitBlockWidth()) {
-        Value * carryPtr = b->CreateGEP(mCurrentFrame, {b->getInt32(0), b->getInt32(mCurrentFrameIndex++), b->getInt32(0)});
-        Value * carryIn = b->CreateBlockAlignedLoad(carryPtr);
-        Value * carryOut, * result;
-        std::tie(carryOut, result) = b->bitblock_indexed_advance(strm, index_strm, carryIn, shiftAmount);
-        b->CreateBlockAlignedStore(carryOut, carryPtr);
-        if ((mIfDepth > 0) && mCarryInfo->hasExplicitSummary()) {
-            addToCarryOutSummary(b, strm);
-        }
-        return result;
-    } else {
-        mIndexedLongAdvanceIndex++;
-        llvm::report_fatal_error("IndexedAdvance > BlockSize not yet supported.");
-    }
-}
-
 
 /** ------------------------------------------------------------------------------------------------------------- *
  * @brief longAdvanceCarryInCarryOut
@@ -1061,10 +1036,6 @@ unsigned CarryManager::assignDefaultCarryGroups(PabloBlock * const scope, const 
                 amount = cast<Advance>(stmt)->getAmount();
                 canPack = (amount < mElementWidth);
             }
-            else if (isa<IndexedAdvance>(stmt)) {
-                amount = cast<Advance>(stmt)->getAmount();
-                canPack = (amount < mElementWidth);
-            }
             if (packedWidth == 0) {
                 ++carryGroups;
             }
@@ -1105,7 +1076,7 @@ StructType * CarryManager::analyse(const std::unique_ptr<kernel::KernelBuilder> 
 
     assert ("scope cannot be null!" && scope);
     assert ("the entry scope -- and only the entry scope -- must be in carry scope 0"
-            && (mCarryScopes == 0 ? (scope == mKernel->getEntryScope()) : (scope != mKernel->getEntryScope())));
+            && (mCarryScopes == 0 ? (scope == mKernel->getEntryBlock()) : (scope != mKernel->getEntryBlock())));
     assert (mCarryScopes < mCarryMetadata.size());
 
     Type * const carryTy = iBuilder->getBitBlockType();
@@ -1122,7 +1093,7 @@ StructType * CarryManager::analyse(const std::unique_ptr<kernel::KernelBuilder> 
             CarryGroup & carryGroup = mCarryGroup[index];
             if (carryGroup.groupSize == 0) {
                 Type * packTy = carryPackTy;
-                if (LLVM_UNLIKELY(isa<Advance>(stmt))) {
+                if (LLVM_LIKELY(isa<Advance>(stmt))) {
                     const auto amount = cast<Advance>(stmt)->getAmount();
                     if (LLVM_UNLIKELY(amount >= mElementWidth)) {
                         if (LLVM_UNLIKELY(ifDepth > 0 && amount > iBuilder->getBitBlockWidth())) {
@@ -1133,17 +1104,6 @@ StructType * CarryManager::analyse(const std::unique_ptr<kernel::KernelBuilder> 
                         const auto blocks = ceil_udiv(amount, iBuilder->getBitBlockWidth());
                         packTy = ArrayType::get(carryTy, nearest_pow2(blocks + ((loopDepth != 0) ? 1 : 0)));
                     }
-                }
-                if (LLVM_UNLIKELY(isa<IndexedAdvance>(stmt))) {
-                    // The carry data for the indexed advance stores N bits of carry data,
-                    // organized in packs that can be processed with GR instructions (such as PEXT, PDEP, popcount).
-                    // A circular buffer is used.  Because the number of bits to be dequeued
-                    // and enqueued is variable (based on the popcount of the index), an extra
-                    // pack stores the offset position in the circular buffer.
-                    const auto amount = cast<IndexedAdvance>(stmt)->getAmount();
-                    const auto packWidth = sizeof(size_t) * 8;
-                    const auto packs = ceil_udiv(amount, packWidth);
-                    packTy = ArrayType::get(iBuilder->getSizeTy(), nearest_pow2(packs) + 1);
                 }
                 state.push_back(packTy);
             }
@@ -1185,7 +1145,7 @@ StructType * CarryManager::analyse(const std::unique_ptr<kernel::KernelBuilder> 
         // carry state pointer, and summary pointer struct.
         if (LLVM_UNLIKELY(nonCarryCollapsingMode)) {
             mHasNonCarryCollapsingLoops = true;
-            carryState = StructType::get(iBuilder->getContext(), {iBuilder->getSizeTy(), carryState->getPointerTo(), carryTy->getPointerTo()};
+            carryState = StructType::get(iBuilder->getSizeTy(), carryState->getPointerTo(), carryTy->getPointerTo(), nullptr);
             assert (isDynamicallyAllocatedType(carryState));
         }
         cd.setNonCollapsingCarryMode(nonCarryCollapsingMode);

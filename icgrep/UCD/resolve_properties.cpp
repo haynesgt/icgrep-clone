@@ -1,9 +1,8 @@
 /*
- *  Copyright (c) 2018 International Characters.
+ *  Copyright (c) 2015 International Characters.
  *  This software is licensed to the public under the Open Software License 3.0.
  *  icgrep is a trademark of International Characters.
  */
-#include <re/re_re.h>
 #include "resolve_properties.h"
 #include <re/re_alt.h>
 #include <re/re_any.h>
@@ -14,10 +13,6 @@
 #include <re/re_cc.h> 
 #include <re/re_seq.h> 
 #include <re/re_assertion.h>
-#include <re/parsers/parser.h>
-#include <re/re_name_resolve.h>
-#include <re/grapheme_clusters.h>
-#include <re/re_compiler.h>
 #include "UCD/PropertyAliases.h"
 #include "UCD/PropertyObjects.h"
 #include "UCD/PropertyObjectTable.h"
@@ -28,15 +23,61 @@ using namespace UCD;
 using namespace re;
 using namespace llvm;
 
+inline int GetPropertyValueEnumCode(const UCD::property_t type, const std::string & value) {
+    return property_object_table[type]->GetPropertyValueEnumCode(value);
+}
+
 namespace UCD {
     
 void UnicodePropertyExpressionError(std::string errmsg) {
     llvm::report_fatal_error(errmsg);
+
 }
-    
-    
-RE * UnicodeBreakRE() {
-    return makeAlt({makeCC(0x0A, 0x0C), makeCC(0x85), makeCC(0x2028,0x2029), makeSeq({makeCC(0x0D), makeNegativeLookAheadAssertion(makeCC(0x0A))})});
+
+
+void generateGraphemeClusterBoundaryRule(Name * const &property) {
+    // 3.1.1 Grapheme Cluster Boundary Rules
+#define Behind(x) makeLookBehindAssertion(x)
+#define Ahead(x) makeLookAheadAssertion(x)
+
+//    RE * GCB_Control = makeName("gcb", "cn", Name::Type::UnicodeProperty);
+    RE * GCB_CR = makeName("gcb", "cr", Name::Type::UnicodeProperty);
+    RE * GCB_LF = makeName("gcb", "lf", Name::Type::UnicodeProperty);
+    RE * GCB_Control_CR_LF = makeAlt({GCB_CR, GCB_LF});
+
+    // Break at the start and end of text.
+    RE * GCB_1 = makeStart();
+    RE * GCB_2 = makeEnd();
+    // Do not break between a CR and LF.
+    RE * GCB_3 = makeSeq({Behind(GCB_CR), Ahead(GCB_LF)});
+    // Otherwise, break before and after controls.
+    RE * GCB_4 = Behind(GCB_Control_CR_LF);
+    RE * GCB_5 = Ahead(GCB_Control_CR_LF);
+    RE * GCB_1_5 = makeAlt({GCB_1, GCB_2, makeDiff(makeAlt({GCB_4, GCB_5}), GCB_3)});
+
+    RE * GCB_L = makeName("gcb", "l", Name::Type::UnicodeProperty);
+    RE * GCB_V = makeName("gcb", "v", Name::Type::UnicodeProperty);
+    RE * GCB_LV = makeName("gcb", "lv", Name::Type::UnicodeProperty);
+    RE * GCB_LVT = makeName("gcb", "lvt", Name::Type::UnicodeProperty);
+    RE * GCB_T = makeName("gcb", "t", Name::Type::UnicodeProperty);
+    RE * GCB_RI = makeName("gcb", "ri", Name::Type::UnicodeProperty);
+    // Do not break Hangul syllable sequences.
+    RE * GCB_6 = makeSeq({Behind(GCB_L), Ahead(makeAlt({GCB_L, GCB_V, GCB_LV, GCB_LVT}))});
+    RE * GCB_7 = makeSeq({Behind(makeAlt({GCB_LV, GCB_V})), Ahead(makeAlt({GCB_V, GCB_T}))});
+    RE * GCB_8 = makeSeq({Behind(makeAlt({GCB_LVT, GCB_T})), Ahead(GCB_T)});
+    // Do not break between regional indicator symbols.
+    RE * GCB_8a = makeSeq({Behind(GCB_RI), Ahead(GCB_RI)});
+    // Do not break before extending characters.
+    RE * GCB_9 = Ahead(makeName("gcb", "ex", Name::Type::UnicodeProperty));
+    // Do not break before SpacingMarks, or after Prepend characters.
+    RE * GCB_9a = Ahead(makeName("gcb", "sm", Name::Type::UnicodeProperty));
+    RE * GCB_9b = Behind(makeName("gcb", "pp", Name::Type::UnicodeProperty));
+    RE * GCB_6_9b = makeAlt({GCB_6, GCB_7, GCB_8, GCB_8a, GCB_9, GCB_9a, GCB_9b});
+    // Otherwise, break everywhere.
+    RE * GCB_10 = makeSeq({Behind(makeAny()), Ahead(makeAny())});
+
+    //Name * gcb = makeName("gcb", Name::Type::UnicodeProperty);
+    property->setDefinition(makeAlt({GCB_1_5, makeDiff(GCB_10, GCB_6_9b)}));
 }
 
 bool resolvePropertyDefinition(Name * const property) {
@@ -59,8 +100,8 @@ bool resolvePropertyDefinition(Name * const property) {
     } else {
         const std::string value = property->getName();
         // Try special cases of Unicode TR #18
-        if ((value == "any") || (value == ".")) {
-            property->setDefinition(makeCC(0, 0x10FFFF));
+        if (value == "any") {
+            property->setDefinition(makeAny());
             return true;
         } else if (value == "ascii") {
             property->setDefinition(makeName("blk", "ascii", Name::Type::UnicodeProperty));
@@ -69,19 +110,79 @@ bool resolvePropertyDefinition(Name * const property) {
             Name * unassigned = makeName("cn", Name::Type::UnicodeProperty);
             property->setDefinition(makeDiff(makeAny(), unassigned));
             return true;
-        } else if (value == "\\b{g}") {
-            RE * gcb = generateGraphemeClusterBoundaryRule();
-            property->setDefinition(resolveUnicodeProperties(gcb));
-            return true;
-        } else if (value == "^s") {  // "start anchor (^) in single-line mode"
-            property->setDefinition(makeNegativeLookBehindAssertion(makeCC(0, 0x10FFFF)));
-            return true;
-        } else if (value == "$s") { // "end anchor ($) in single-line mode"
-            property->setDefinition(makeNegativeLookAheadAssertion(makeCC(0, 0x10FFFF)));
+        } else if (value == "GCB" || value == "NonGCB"){
+            generateGraphemeClusterBoundaryRule(property);
             return true;
         }
     }
     return false;
+}
+
+std::string resolvePropertyFunction(Name * const property) {
+    const std::string value = property->getName();
+    std::string functionName;
+    if (property->hasNamespace()) {
+        auto propit = alias_map.find(property->getNamespace());
+        if (propit == alias_map.end()) {
+            UnicodePropertyExpressionError("Expected a property name but '" + property->getNamespace() + "' was found instead");
+        }
+        auto theprop = propit->second;
+        if (EnumeratedPropertyObject * p = dyn_cast<EnumeratedPropertyObject>(property_object_table[theprop])){
+            int valcode = p->GetPropertyValueEnumCode(value);
+            if (valcode < 0) {
+                UnicodePropertyExpressionError("Erroneous property value '" + value + "' for " + property_full_name[theprop] + " property");
+            }
+            functionName = "__get_" + property_enum_name[theprop] + "_" + p->GetValueEnumName(valcode);
+        }
+        else if (theprop == scx) {
+            // Script extension property identified
+            int valcode = GetPropertyValueEnumCode(sc, value);
+            if (valcode < 0) {
+                UnicodePropertyExpressionError("Erroneous property value for script_extension property");
+            }
+            functionName = "__get_scx_" + SC_ns::enum_names[valcode];
+        }
+        else if (isa<BinaryPropertyObject>(property_object_table[theprop])){
+            auto valit = Binary_ns::aliases_only_map.find(value);
+            if (valit == Binary_ns::aliases_only_map.end()) {
+                UnicodePropertyExpressionError("Erroneous property value for binary property " + property_full_name[theprop]);
+            }
+            if (valit->second == Binary_ns::Y) {
+                functionName = "__get_" + property_enum_name[theprop] + "_Y";
+            } else {
+                UnicodePropertyExpressionError("Unexpected property value for binary property " + property_full_name[theprop]);
+            }
+        }
+        else {
+            UnicodePropertyExpressionError("Property " + property_full_name[theprop] + " recognized but not supported in icgrep 1.0");
+        }
+    } else { // No namespace (property) name.
+        // Try as a general category, script or binary property.
+        int valcode;
+        if ((valcode = GetPropertyValueEnumCode(gc, value)) >= 0) {
+            functionName = "__get_gc_" + GC_ns::enum_names[valcode];
+        }
+        else if ((valcode = GetPropertyValueEnumCode(sc, value)) >= 0) {
+            functionName = "__get_sc_" + SC_ns::enum_names[valcode];
+        }
+        else { // Try as a binary property.
+            auto propit = alias_map.find(value);
+            if (propit != alias_map.end()) {
+                auto theprop = propit->second;
+                if (isa<BinaryPropertyObject>(property_object_table[theprop])) {
+                    functionName = "__get_" + property_enum_name[theprop] + "_Y";
+                }
+                else {
+                    UnicodePropertyExpressionError("Error: property " + property_full_name[theprop] + " specified without a value");
+                }
+            }
+            else {
+                UnicodePropertyExpressionError("Expected a general category, script or binary property name but '" + value + "' was found instead");
+            }
+        }
+    }
+    assert (functionName.length() > 0);
+    return functionName;
 }
 
 const std::string & getPropertyValueGrepString(const std::string & prop) {
@@ -102,54 +203,35 @@ const std::string & getPropertyValueGrepString(const std::string & prop) {
 UnicodeSet resolveUnicodeSet(Name * const name) {
     if (name->getType() == Name::Type::UnicodeProperty) {
         std::string prop = name->getNamespace();
-        std::string value = name->getName();
+        std::string value = canonicalize_value_name(name->getName());
         if (prop.length() > 0) {
             prop = canonicalize_value_name(prop);
             auto propit = alias_map.find(prop);
             if (propit == alias_map.end()) {
                 UnicodePropertyExpressionError("Expected a property name, but '" + name->getNamespace() + "' found instead");
             }
-            auto propObj = property_object_table[propit->second];
-            if ((value.length() > 0) && (value[0] == '/')) {
-                // resolve a regular expression
-                re::RE * propValueRe = RE_Parser::parse(value.substr(1), re::DEFAULT_MODE, re::PCRE, false);
-                propValueRe = re::resolveNames(propValueRe);  // Recursive name resolution may be required.
-                return propObj->GetCodepointSetMatchingPattern(propValueRe);
+            auto theprop = propit->second;
+            if (EnumeratedPropertyObject * p = dyn_cast<EnumeratedPropertyObject>(property_object_table[theprop])){
+                return p->GetCodepointSet(value);
             }
-            if ((value.length() > 0) && (value[0] == '@')) {
-                // resolve a @property@ or @identity@ expression.
-                std::string otherProp = canonicalize_value_name(value.substr(1));
-                if (otherProp == "identity") {
-                    return propObj->GetReflexiveSet();
+            else if (BinaryPropertyObject * p = dyn_cast<BinaryPropertyObject>(property_object_table[theprop])){
+                auto valit = Binary_ns::aliases_only_map.find(value);
+                if (valit == Binary_ns::aliases_only_map.end()) {
+                    UnicodePropertyExpressionError("Erroneous property value for binary property " + property_full_name[theprop]);
                 }
-                auto propit = alias_map.find(prop);
-                if (propit == alias_map.end()) {
-                    UnicodePropertyExpressionError("Expected a property name, but '" + value.substr(1) + "' found instead");
-                }
-                auto propObj2 = property_object_table[propit->second];
-                if (isa<BinaryPropertyObject>(propObj) && isa<BinaryPropertyObject>(propObj2)) {
-                    return ~(cast<BinaryPropertyObject>(propObj)->GetCodepointSet(UCD::Binary_ns::Y) ^
-                             cast<BinaryPropertyObject>(propObj2)->GetCodepointSet(UCD::Binary_ns::Y));
-                }
-                else {
-                    UnicodePropertyExpressionError("unsupported");
-                }
-            }
-            else {
-                return propObj->GetCodepointSet(value);
-            }
+                return p->GetCodepointSet(value);
+            }           
+            UnicodePropertyExpressionError("Property " + property_full_name[theprop] + " recognized but not supported in icgrep 1.0");
         }
         else {
             // No namespace (property) name.   Try as a general category.
-            const auto & gcobj = cast<EnumeratedPropertyObject>(property_object_table[gc]);
-            int valcode = gcobj->GetPropertyValueEnumCode(value);
+            int valcode = GetPropertyValueEnumCode(gc, value);
             if (valcode >= 0) {
-                return gcobj->GetCodepointSet(valcode);
+                return cast<EnumeratedPropertyObject>(property_object_table[gc])->GetCodepointSet(valcode);
             }
-            const auto & scObj = cast<EnumeratedPropertyObject>(property_object_table[sc]);
-            valcode = scObj->GetPropertyValueEnumCode(value);
+            valcode = GetPropertyValueEnumCode(sc, value);
             if (valcode >= 0) {
-                return scObj->GetCodepointSet(valcode);
+                return cast<EnumeratedPropertyObject>(property_object_table[sc])->GetCodepointSet(valcode);
             }
             // Try as a binary property.
             auto propit = alias_map.find(value);
@@ -165,7 +247,6 @@ UnicodeSet resolveUnicodeSet(Name * const name) {
             // Try special cases of Unicode TR #18
             // Now compatibility properties of UTR #18 Annex C
                     
-            else if (value == ".") return UnicodeSet(0, 0x10FFFF);
             else if (value == "alnum") {
                 Name * digit = makeName("nd", Name::Type::UnicodeProperty);
                 Name * alpha = makeName("alphabetic", Name::Type::UnicodeProperty);

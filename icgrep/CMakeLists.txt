@@ -44,7 +44,7 @@ endif()
 
 # Let's suppose we want to build a JIT compiler with support for
 # binary code (no interpreter):
-set(LLVM_ALL_TARGETS X86)
+set(LLVM_ALL_TARGETS AArch64 AMDGPU ARM BPF CppBackend Hexagon Mips MSP430 NVPTX PowerPC Sparc SystemZ X86 XCore)
 llvm_map_components_to_libnames(REQ_LLVM_LIBRARIES ${LLVM_ALL_TARGETS} mcjit native IRReader Linker)
 
 # Check if boost has been installed on this system.
@@ -59,23 +59,15 @@ link_directories(${Boost_LIBRARY_DIR})
 
 SET(OBJECT_CACHE_SRC toolchain/object_cache.cpp)
 
-SET(GREP_CORE_SRC kernels/linebreak_kernel.cpp kernels/grep_kernel.cpp kernels/scanmatchgen.cpp )
-
 SET(TOOLCHAIN_SRC toolchain/toolchain.cpp toolchain/pipeline.cpp)
 
-SET(DRIVER_SRC toolchain/driver.cpp toolchain/cpudriver.cpp)
-if(ENABLE_CUDA_COMPILE)
-SET(DRIVER_SRC ${DRIVER_SRC} toolchain/NVPTXDriver.cpp)
-endif()
+SET(DRIVER_SRC toolchain/driver.cpp toolchain/cpudriver.cpp toolchain/NVPTXDriver.cpp)
 
-SET(KERNEL_SRC kernels/attributes.cpp kernels/processing_rate.cpp kernels/interface.cpp kernels/kernel.cpp kernels/streamset.cpp kernels/kernel_builder.cpp)
+SET(KERNEL_SRC kernels/kernel.cpp kernels/streamset.cpp kernels/interface.cpp kernels/kernel_builder.cpp)
 SET(KERNEL_SRC ${KERNEL_SRC} kernels/source_kernel.cpp kernels/s2p_kernel.cpp kernels/deletion.cpp kernels/swizzle.cpp kernels/p2s_kernel.cpp kernels/stdout_kernel.cpp)
 
-SET(IDISA_SRC IR_Gen/CBuilder.cpp IR_Gen/idisa_builder.cpp IR_Gen/idisa_avx_builder.cpp IR_Gen/idisa_i64_builder.cpp IR_Gen/idisa_sse_builder.cpp)
+SET(IDISA_SRC IR_Gen/CBuilder.cpp IR_Gen/idisa_builder.cpp IR_Gen/idisa_avx_builder.cpp IR_Gen/idisa_i64_builder.cpp IR_Gen/idisa_sse_builder.cpp IR_Gen/idisa_nvptx_builder.cpp)
 SET(IDISA_SRC ${IDISA_SRC} IR_Gen/idisa_target.cpp)
-if(ENABLE_CUDA_COMPILE)
-SET(IDISA_SRC ${IDISA_SRC} IR_Gen/idisa_nvptx_builder.cpp)
-endif()
 
 SET(PABLO_SRC pablo/pabloAST.cpp pablo/branch.cpp pablo/codegenstate.cpp pablo/builder.cpp pablo/symbol_generator.cpp pablo/printer_pablos.cpp pablo/pablo_toolchain.cpp)
 SET(PABLO_SRC ${PABLO_SRC} pablo/pablo_kernel.cpp pablo/pablo_compiler.cpp)
@@ -85,24 +77,19 @@ ELSE()
 SET(PABLO_SRC ${PABLO_SRC} pablo/carry_manager.cpp)
 ENDIF()
 SET(PABLO_SRC ${PABLO_SRC} pablo/analysis/pabloverifier.cpp)
+SET(PABLO_SRC ${PABLO_SRC} pablo/passes/ssapass.cpp)
 SET(PABLO_SRC ${PABLO_SRC} pablo/optimizers/pablo_simplifier.cpp pablo/optimizers/codemotionpass.cpp pablo/optimizers/distributivepass.cpp pablo/optimizers/schedulingprepass.cpp)
 SET(PABLO_SRC ${PABLO_SRC} pablo/passes/flattenif.cpp)
 IF(ENABLE_MULTIPLEXING)
 SET(PABLO_SRC ${PABLO_SRC} pablo/optimizers/pablo_automultiplexing.cpp)
 ENDIF()
 
-SET (RE_PARSERS_SRC re/parsers/PCRE_parser.cpp re/parsers/ERE_parser.cpp re/parsers/BRE_parser.cpp re/parsers/Prosite_parser.cpp re/parsers/fixed_string_parser.cpp re/parsers/GLOB_parser.cpp re/parsers/parser.cpp)
-
 add_library(CodeGen ${TOOLCHAIN_SRC} ${DRIVER_SRC} ${OBJECT_CACHE_SRC} ${KERNEL_SRC} ${IDISA_SRC})
 add_library(PabloADT ${PABLO_SRC})
-# CCADT is the core library for representing and compiling character classes
-add_library(CCADT re/re_re.cpp re/re_cc.cpp cc/cc_compiler.cpp cc/alphabet.cpp cc/multiplex_CCs.cpp UCD/unicode_set.cpp)
-# RegExpADT is the core library for representing, parsing and printing regular expressions
-add_library(RegExpADT re/re_rep.cpp re/re_diff.cpp re/re_intersect.cpp re/re_range.cpp re/re_assertion.cpp re/printer_re.cpp re/re_utility.cpp)
-add_library(RegExpCompiler ${RE_PARSERS_SRC} re/casing.cpp re/to_utf8.cpp re/re_memoizer.cpp re/re_nullable.cpp re/re_simplifier.cpp re/re_star_normal.cpp re/re_minimizer.cpp re/re_local.cpp re/re_compiler.cpp re/re_analysis.cpp re/re_toolchain.cpp re/re_name_resolve.cpp re/re_name_gather.cpp re/collect_ccs.cpp re/re_multiplex.cpp re/re_utility.cpp re/grapheme_clusters.cpp re/exclude_CC.cpp re/replaceCC.cpp)
-add_library(UCDlib UCD/CaseFolding.cpp utf8_encoder.cpp utf16_encoder.cpp UCD/ucd_compiler.cpp UCD/PropertyObjects.cpp UCD/resolve_properties.cpp)
-add_library(GrepEngine  ${GREP_CORE_SRC} grep/grep_engine.cpp kernels/cc_kernel.cpp kernels/cc_scan_kernel.cpp kernels/charclasses.cpp kernels/streams_merge.cpp kernels/until_n.cpp kernels/UCD_property_kernel.cpp kernels/grapheme_kernel.cpp)
-add_library(LZ4_Lib lz4FrameDecoder.cpp kernels/cc_kernel.cpp kernels/lz4/lz4_deposit_uncompressed.cpp kernels/lz4/lz4_generate_deposit_stream.cpp kernels/pdep_kernel.cpp kernels/lz4/lz4_match_copy_kernel.cpp lz4/LZ4Generator.cpp kernels/lz4/lz4_multiple_pdep_kernel.cpp kernels/lz4/lz4_swizzled_match_copy_kernel.cpp kernels/lz4/lz4_block_decoder.cpp kernels/lz4/lz4_index_builder.cpp lz4/LZ4GrepEngine.cpp)
+add_library(RegExpADT re/re_re.cpp re/re_cc.cpp re/re_rep.cpp re/re_diff.cpp re/re_intersect.cpp re/printer_re.cpp)
+add_library(RegExpCompiler re/re_parser.cpp re/re_nullable.cpp re/re_simplifier.cpp re/re_star_normal.cpp re/re_local.cpp re/re_compiler.cpp re/re_analysis.cpp re/re_toolchain.cpp re/re_name_resolve.cpp re/re_name_gather.cpp re/re_collect_unicodesets.cpp re/re_multiplex.cpp re/re_parser_pcre.cpp re/re_parser_ere.cpp re/re_parser_bre.cpp re/re_parser_prosite.cpp re/re_utility.cpp)
+add_library(CCADT cc/cc_compiler.cpp utf8_encoder.cpp utf16_encoder.cpp UCD/CaseFolding_txt.cpp cc/alphabet.cpp cc/multiplex_CCs.cpp)
+add_library(UCDlib UCD/unicode_set.cpp UCD/ucd_compiler.cpp UCD/PropertyObjects.cpp UCD/resolve_properties.cpp UCD/UnicodeNameData.cpp)
 
 # force the compiler to compile the object cache to ensure that the versioning information is up to date
 add_custom_target(RecompileObjectCache ALL touch ${CMAKE_CURRENT_SOURCE_DIR}/${OBJECT_CACHE_SRC})
@@ -112,40 +99,28 @@ add_dependencies(CodeGen RecompileObjectCache)
 target_link_libraries (CodeGen ${REQ_LLVM_LIBRARIES})
 target_link_libraries (PabloADT CodeGen)
 target_link_libraries (CCADT PabloADT)
-target_link_libraries (RegExpADT PabloADT CCADT)
-target_link_libraries (UCDlib GrepEngine RegExpCompiler RegExpADT PabloADT CCADT)
-target_link_libraries (RegExpCompiler UCDlib CCADT RegExpADT)
-target_link_libraries (GrepEngine RegExpCompiler CodeGen)
+target_link_libraries (UCDlib RegExpADT PabloADT CCADT)
+target_link_libraries (RegExpADT PabloADT CCADT UCDlib)
+target_link_libraries (RegExpCompiler RegExpADT)
 
-add_executable(icgrep icgrep.cpp util/file_select.cpp grep_interface.cpp)
+add_executable(icgrep icgrep.cpp grep_interface.cpp grep_engine.cpp kernels/scanmatchgen.cpp kernels/u8u32_kernel.cpp kernels/delmask_kernel.cpp kernels/cc_kernel.cpp kernels/cc_scan_kernel.cpp kernels/charclasses.cpp kernels/linebreak_kernel.cpp kernels/streams_merge.cpp kernels/grep_kernel.cpp kernels/until_n.cpp)
 add_executable(u8u16 u8u16.cpp)
 add_executable(base64 base64.cpp kernels/radix64.cpp)
-add_executable(wc wc.cpp util/file_select.cpp)
+add_executable(wc wc.cpp)
 add_executable(editd editd/editd.cpp editd/pattern_compiler.cpp editd/editdscan_kernel.cpp editd/editd_gpu_kernel.cpp editd/editd_cpu_kernel.cpp kernels/streams_merge.cpp kernels/cc_kernel.cpp)
-add_executable(lz4d lz4d.cpp lz4FrameDecoder.cpp kernels/cc_kernel.cpp kernels/lz4/lz4_index_decoder.cpp kernels/lz4/lz4_bytestream_decoder.cpp)
-add_executable(core combine/core.cpp combine/regexGen.cpp combine/stringGen.cpp combine/propGen.cpp combine/icgrep-test/icgrep-test.cpp grep_interface.cpp grep/grep_engine.cpp kernels/scanmatchgen.cpp kernels/u8u32_kernel.cpp kernels/delmask_kernel.cpp kernels/cc_kernel.cpp kernels/cc_scan_kernel.cpp kernels/charclasses.cpp kernels/linebreak_kernel.cpp kernels/streams_merge.cpp kernels/grep_kernel.cpp kernels/until_n.cpp)
-add_executable(character_deletion character_deletion.cpp kernels/cc_kernel.cpp)
-add_executable(character_deposit character_deposit.cpp kernels/cc_kernel.cpp kernels/pdep_kernel.cpp kernels/lz4/lz4_multiple_pdep_kernel.cpp)
-add_executable(lz4d_ext_dep lz4d_ext_dep.cpp)
-add_executable(lz4_grep grep_interface.cpp util/file_select.cpp lz4_grep.cpp lz4/LZ4GrepGenerator.cpp)
+add_executable(array-test array-test.cpp kernels/alignedprint.cpp)
+add_executable(lz4d lz4d.cpp lz4FrameDecoder.cpp kernels/cc_kernel.cpp kernels/lz4_index_decoder.cpp kernels/lz4_bytestream_decoder.cpp)
+add_executable(core combine/core.cpp combine/regexGen.cpp combine/stringGen.cpp combine/icgrep-test/icgrep-test.cpp combine/pugixml/src/pugixml.cpp grep_interface.cpp grep_engine.cpp kernels/scanmatchgen.cpp kernels/u8u32_kernel.cpp kernels/delmask_kernel.cpp kernels/cc_kernel.cpp kernels/cc_scan_kernel.cpp kernels/charclasses.cpp kernels/linebreak_kernel.cpp kernels/streams_merge.cpp kernels/grep_kernel.cpp kernels/until_n.cpp)
 
 
-#Exclude CoRE from default build.
-set_target_properties(core PROPERTIES EXCLUDE_FROM_ALL 1)
-
-target_link_libraries (icgrep GrepEngine UCDlib PabloADT RegExpCompiler CCADT CodeGen ${REQ_LLVM_LIBRARIES} ${Boost_LIBRARIES} ${CUDA_LIB} ${CUDA_RT})
-target_link_libraries (u8u16 PabloADT CCADT CodeGen ${REQ_LLVM_LIBRARIES} ${Boost_LIBRARIES} ${CUDA_LIB} ${CUDA_RT})
-target_link_libraries (base64 PabloADT CCADT CodeGen ${REQ_LLVM_LIBRARIES} ${Boost_LIBRARIES} ${CUDA_LIB} ${CUDA_RT})
-target_link_libraries (wc GrepEngine UCDlib PabloADT RegExpCompiler  CCADT CodeGen ${REQ_LLVM_LIBRARIES} ${Boost_LIBRARIES} ${CUDA_LIB} ${CUDA_RT})
-target_link_libraries (editd PabloADT CCADT CodeGen ${REQ_LLVM_LIBRARIES} ${Boost_LIBRARIES} ${CUDA_LIB} ${CUDA_RT})
-target_link_libraries (lz4d PabloADT CCADT CodeGen ${REQ_LLVM_LIBRARIES} ${Boost_LIBRARIES} ${CUDA_LIB} ${CUDA_RT})
+target_link_libraries (icgrep UCDlib PabloADT RegExpCompiler CCADT CodeGen ${REQ_LLVM_LIBRARIES} ${Boost_LIBRARIES} ${CUDA_LIB})
+target_link_libraries (u8u16 UCDlib PabloADT RegExpCompiler CCADT CodeGen ${REQ_LLVM_LIBRARIES} ${Boost_LIBRARIES} ${CUDA_LIB})
+target_link_libraries (base64 UCDlib PabloADT RegExpCompiler CCADT CodeGen ${REQ_LLVM_LIBRARIES} ${Boost_LIBRARIES} ${CUDA_LIB})
+target_link_libraries (wc UCDlib PabloADT RegExpCompiler CCADT CodeGen ${REQ_LLVM_LIBRARIES} ${Boost_LIBRARIES} ${CUDA_LIB})
+target_link_libraries (editd UCDlib PabloADT RegExpCompiler CCADT CodeGen ${REQ_LLVM_LIBRARIES} ${Boost_LIBRARIES} ${CUDA_LIB})
+target_link_libraries (array-test PabloADT CodeGen ${REQ_LLVM_LIBRARIES} ${Boost_LIBRARIES} ${CUDA_LIB})
+target_link_libraries (lz4d PabloADT RegExpCompiler CodeGen ${REQ_LLVM_LIBRARIES} ${Boost_LIBRARIES} ${CUDA_LIB})
 target_link_libraries (core RegExpCompiler ${REQ_LLVM_LIBRARIES} ${Boost_LIBRARIES})
-target_link_libraries (character_deletion PabloADT RegExpCompiler CCADT CodeGen ${REQ_LLVM_LIBRARIES} ${Boost_LIBRARIES} ${CUDA_LIB} ${CUDA_RT})
-target_link_libraries (character_deposit PabloADT RegExpCompiler CCADT CodeGen ${REQ_LLVM_LIBRARIES} ${Boost_LIBRARIES} ${CUDA_LIB} ${CUDA_RT})
-target_link_libraries (lz4d_ext_dep LZ4_Lib PabloADT CCADT CodeGen ${REQ_LLVM_LIBRARIES} ${Boost_LIBRARIES} ${CUDA_LIB} ${CUDA_RT})
-target_link_libraries (lz4_grep LZ4_Lib GrepEngine UCDlib PabloADT RegExpCompiler CodeGen CCADT CodeGen ${REQ_LLVM_LIBRARIES} ${Boost_LIBRARIES} ${CUDA_LIB} ${CUDA_RT})
-
-
 
 IF(ENABLE_MULTIPLEXING)
     message(STATUS "Enabling Multiplexing")
@@ -183,7 +158,7 @@ endif()
 IF (MSVC) # using Visual Studio C++
   SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /GR-")
 ELSE() # using Clang, GCC, Intel C++, etc
-  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")  
+  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")
 ENDIF()
 
 #Disable Dual ABI support
@@ -222,15 +197,17 @@ ENDIF()
 SET(CMAKE_REQUIRED_FLAGS)
 
 # detect LLVM version and add compiler flags.
-MATH(EXPR LLVM_VERSION_INTEGER "${LLVM_VERSION_MAJOR} * 10000 + ${LLVM_VERSION_MINOR} * 100 + ${LLVM_VERSION_PATCH}")
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DLLVM_VERSION_INTEGER=${LLVM_VERSION_INTEGER}")
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DLLVM_VERSION_major=${LLVM_VERSION_MAJOR} -DLLVM_VERSION_MINOR=${LLVM_VERSION_MINOR}")
-message(STATUS "LLVM Version Integer: ${LLVM_VERSION_INTEGER}")
+IF (${LLVM_VERSION_MAJOR} EQUAL 3)
+  IF (${LLVM_VERSION_MINOR} EQUAL 6)
+    message(STATUS "Found LLVM ${LLVM_VERSION_MAJOR}.${LLVM_VERSION_MINOR}")
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_LLVM_3_6")
+  ELSEIF (${LLVM_VERSION_MINOR} EQUAL 7)
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_LLVM_3_7")
+  ENDIF()
+ENDIF()
 
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DPARABIX_VERSION='\"${Parabix_REVISION}\"'")
-IF (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fuse-ld=gold")
-ENDIF()
 
 SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_RELEASE} -O3 -DNDEBUG")
 
@@ -263,10 +240,10 @@ add_test(
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/../QA/u8u16
   COMMAND ./run_all "${CMAKE_BINARY_DIR}/u8u16 -segment-size=16 -enable-segment-pipeline-parallel")
 
-#add_test(
-#  NAME lz4d_test
-#  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/../QA/lz4d
-#  COMMAND ./run_all ${CMAKE_BINARY_DIR}/lz4d)
+add_test(
+  NAME lz4d_test
+  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/../QA/lz4d
+  COMMAND ./run_all ${CMAKE_BINARY_DIR}/lz4d)
 
 add_test(
   NAME editd_test
@@ -278,45 +255,26 @@ add_test(
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/../QA/base64
   COMMAND python base64test.py ${CMAKE_BINARY_DIR}/base64)
 
-#add_test(
-#  NAME character_deletion_test
-#  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/../QA/character_deletion
-#  COMMAND python character_deletion_test.py ${CMAKE_BINARY_DIR}/character_deletion
-#)
-
-#add_test(
-#  NAME character_deposit_test
-#  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/../QA/character_deposit
-#  COMMAND python character_deposit_test.py ${CMAKE_BINARY_DIR}/character_deposit
-#)
-
-#add_test(
-#  NAME lz4d_ext_dep_test
-#  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/../QA/lz4d_ext_dep
-#  COMMAND python main.py ${CMAKE_BINARY_DIR}/lz4d_ext_dep
-#)
-
 SET_PROPERTY(TEST greptest PROPERTY TIMEOUT 400)
 SET_PROPERTY(TEST proptest PROPERTY TIMEOUT 1500)
-SET_PROPERTY(TEST abc_test PROPERTY TIMEOUT 100)
-SET_PROPERTY(TEST u8u16_test editd_test base64_test PROPERTY TIMEOUT 40)
+SET_PROPERTY(TEST abc_test u8u16_test lz4d_test editd_test base64_test PROPERTY TIMEOUT 40)
 
 
 add_custom_target (greptest
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/../QA
-  COMMAND python greptest.py "${CMAKE_BINARY_DIR}/icgrep")
+  COMMAND python greptest.py "${CMAKE_BINARY_DIR}/icgrep -ea")
 
 add_custom_target (proptest
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/../QA
-  COMMAND python greptest.py -d ${PROJECT_SOURCE_DIR}/../QA -t ${PROJECT_SOURCE_DIR}/../QA/proptest.xml "${CMAKE_BINARY_DIR}/icgrep")
+  COMMAND python greptest.py -d ${PROJECT_SOURCE_DIR}/../QA -t ${PROJECT_SOURCE_DIR}/../QA/proptest.xml "${CMAKE_BINARY_DIR}/icgrep -ea")
 
 add_custom_target (u8u16_test
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/../QA/u8u16
-  COMMAND ./run_all "${CMAKE_BINARY_DIR}/u8u16 -segment-size=16 -enable-segment-pipeline-parallel")
+  COMMAND ./run_all "${CMAKE_BINARY_DIR}/u8u16 -ea -segment-size=16 -enable-segment-pipeline-parallel")
 
 add_custom_target (lz4d_test
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/../QA/lz4d
-  COMMAND ./run_all "${CMAKE_BINARY_DIR}/lz4d")
+  COMMAND ./run_all "${CMAKE_BINARY_DIR}/lz4d -ea")
 
 add_custom_target (editd_test
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/../QA/editd
@@ -324,22 +282,7 @@ add_custom_target (editd_test
 
 add_custom_target (base64_test
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/../QA/base64
-  COMMAND python base64test.py "${CMAKE_BINARY_DIR}/base64")
-
-#add_custom_target(character_deletion_test
-#  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/../QA/character_deletion
-#  COMMAND python character_deletion_test.py ${CMAKE_BINARY_DIR}/character_deletion
-#)
-
-#add_custom_target(character_deposit_test
-#  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/../QA/character_deposit
-#  COMMAND python character_deposit_test.py ${CMAKE_BINARY_DIR}/character_deposit
-#)
-
-#add_custom_target(lz4d_ext_dep_test
-#  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/../QA/lz4d_ext_dep_test
-#  COMMAND python main.py ${CMAKE_BINARY_DIR}/lz4d_ext_dep_test
-#)
+  COMMAND python base64test.py "${CMAKE_BINARY_DIR}/base64 -ea")
 
 add_custom_target (abc_gen
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/../QA
@@ -347,7 +290,7 @@ add_custom_target (abc_gen
   
 add_custom_target (abc_test
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/../QA
-  COMMAND ./run_abc "${CMAKE_BINARY_DIR}/icgrep")
+  COMMAND ./run_abc "${CMAKE_BINARY_DIR}/icgrep -ea")
 
 add_custom_target (check
   COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
@@ -365,5 +308,8 @@ add_custom_target (viewer
 add_custom_target (text_viewer
   COMMAND python2 viewer.py -t
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/../performance)
+
+add_custom_target (clear_cache
+  COMMAND rm ~/.cache/parabix/*)
 
 
