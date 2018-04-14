@@ -56,6 +56,8 @@ void NVPTXDriver::makeKernelCall(kernel::Kernel * kb, const std::vector<parabix:
     kb->setModule(iBuilder, mMainModule);
 }
 
+#include <iostream>
+
 void NVPTXDriver::generatePipelineIR() {
     #ifndef NDEBUG
     if (LLVM_UNLIKELY(mPipeline.empty())) {
@@ -195,6 +197,10 @@ static int llvm2ptx(Module * M, std::string PTXFilename) {
 }
 
 void NVPTXDriver::finalizeObject() {
+  assert("Need to know main function in order to finalize object\n" && false);
+}
+
+void NVPTXDriver::finalizeObject(int REi) {
 
     legacy::PassManager PM;
     PM.add(createPromoteMemoryToRegisterPass()); //Force the use of mem2reg to promote stack variables.
@@ -208,7 +214,9 @@ void NVPTXDriver::finalizeObject() {
         kb->generateKernel(iBuilder);
     }
 
-    Function * mainFunc = mMainModule->getFunction("Main");
+    Function * mainFunc = mMainModule->getFunction(std::string("Main") + std::to_string(REi));
+
+    std::cout << (std::string("Main") + std::to_string(REi)) << ": " << mainFunc << std::endl;
 
     MDNode * Node = MDNode::get(mMainModule->getContext(),
                                 {llvm::ValueAsMetadata::get(mainFunc),
@@ -219,9 +227,9 @@ void NVPTXDriver::finalizeObject() {
 
     PM.run(*mMainModule);  
 
-    if (LLVM_UNLIKELY(codegen::DebugOptionIsSet(codegen::ShowIR))) {
-        mMainModule->dump();
-    }
+//    if (LLVM_UNLIKELY(codegen::DebugOptionIsSet(codegen::ShowIR))) {
+//        mMainModule->dump();
+//    }
 
     const auto PTXFilename = mMainModule->getModuleIdentifier() + ".ptx";
 

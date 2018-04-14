@@ -44,6 +44,8 @@ public:
     void deallocateBuffers();
     
     virtual void finalizeObject() = 0;
+
+    virtual void finalizeObject(int i) { finalizeObject(); }
     
     virtual void * getMain() = 0; // "main" exists until the driver is deleted
 

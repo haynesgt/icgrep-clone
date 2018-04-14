@@ -7,6 +7,7 @@
 #include <cassert>
 #include <toolchain/toolchain.h>
 #include "cuda.h"
+#include "cuda_runtime.h"
 
 #define GROUPTHREADS 64
 
@@ -14,14 +15,22 @@ void checkCudaErrors(CUresult err) {
   assert(err == CUDA_SUCCESS);
 }
 
+struct PtxBundle {
+  CUfunction function;
+  cudaStream_t stream;
+  CUdeviceptr devBufferOutput;
+};
+
 /// main - Program entry point
-ulong * RunPTX(std::string PTXFilename, char * fileBuffer, ulong filesize, bool CountOnly, std::vector<size_t> LFPositions, ulong * startPoints, ulong * accumBytes) {
+ulong * RunPTX(std::string PTXFilename_in, char * fileBuffer, ulong filesize, bool CountOnly, std::vector<size_t> LFPositions, ulong * startPoints, ulong * accumBytes, int REn) {
   
   CUdevice    device;
-  CUmodule    cudaModule;
   CUcontext   context;
-  CUfunction  function;
+  std::vector<PtxBundle> bundles;
   int         devCount;
+
+  CUmodule cudaModule;
+  std::string PTXFilename = PTXFilename_in;
 
   // CUDA initialization
   checkCudaErrors(cuInit(0));
@@ -30,38 +39,54 @@ ulong * RunPTX(std::string PTXFilename, char * fileBuffer, ulong filesize, bool 
 
   char name[128];
   checkCudaErrors(cuDeviceGetName(name, 128, device));
-  // std::cout << "Using CUDA Device [0]: " << name << "\n";
+  std::cout << "Using CUDA Device [0]: " << name << "\n";
 
   int devMajor, devMinor;
   checkCudaErrors(cuDeviceComputeCapability(&devMajor, &devMinor, device));
+  //checkCudaErrors(cuDeviceGetAttribute(&devMajor, CUdevice_attribute::CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR, device));
   // std::cout << "Device Compute Capability: " << devMajor << "." << devMinor << "\n";
   if (devMajor < 2) {
-    std::cerr << "ERROR: Device 0 is not SM 2.0 or greater\n";
-    exit(-1);
+    std::cerr << "ERROR: Device 0 is not SM 2.0 or greater\n" << devMajor << "\n";
+  //  exit(-1);
   }
-
-  std::ifstream t(PTXFilename);
-  if (!t.is_open()) {
-    std::cerr << "Error: cannot open " << PTXFilename << " for processing. Skipped.\n";
-    exit(-1);
-  }
-  
-  std::string ptx_str((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
 
   // Create driver context
   checkCudaErrors(cuCtxCreate(&context, 0, device));
 
-  // Create module for object
-  checkCudaErrors(cuModuleLoadDataEx(&cudaModule, ptx_str.c_str(), 0, 0, 0));
+  CUfunction  function;
 
-  // Get kernel function
-  checkCudaErrors(cuModuleGetFunction(&function, cudaModule, "Main"));
+  for (int REi = 0; REi < REn; REi++) {
+    std::ifstream t(PTXFilename + std::to_string(REi) + std::string(".ptx"));
+    if (!t.is_open()) {
+      std::cerr << "Error: cannot open " << PTXFilename << " for processing. Skipped.\n";
+      exit(-1);
+    }
+
+    std::string ptx_str((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
+
+    // Create module for object
+    checkCudaErrors(cuModuleLoadDataEx(&cudaModule, ptx_str.c_str(), 0, 0, 0));
+
+    cudaStream_t stream;
+
+    // Get kernel function
+    checkCudaErrors(cuModuleGetFunction(&function, cudaModule, (std::string("Main") + std::to_string(REi)).c_str() ));
+    std::cout << "Found Function: " << REi << "\n";
+
+    cudaStreamCreate(&stream);
+
+    PtxBundle bundle;
+    bundle.function = function;
+    bundle.stream = stream;
+    bundles.push_back(bundle);
+  }
+
+  std::cout << "Found kernel functions\n";
 
   // Device data
   CUdeviceptr devBufferInput;
   CUdeviceptr devStartPoints;
   CUdeviceptr devBufferSizes;
-  CUdeviceptr devBufferOutput;
 
   int groupSize = GROUPTHREADS * sizeof(ulong) * 8;
   const unsigned numOfGroups = codegen::GroupNum;
@@ -111,7 +136,7 @@ ulong * RunPTX(std::string PTXFilename, char * fileBuffer, ulong filesize, bool 
   else{
     outputSize = startPoints[numOfGroups]/4;
   }
-  checkCudaErrors(cuMemAlloc(&devBufferOutput, outputSize));
+
 
   //Copy from host to device
   for(unsigned i=0; i<numOfGroups; i++){
@@ -127,10 +152,8 @@ ulong * RunPTX(std::string PTXFilename, char * fileBuffer, ulong filesize, bool 
   unsigned gridSizeY  = 1;
   unsigned gridSizeZ  = 1;
 
-  // Kernel parameters
-  void *KernelParams[] = { &devBufferInput, &devStartPoints, &devBufferSizes, &devBufferOutput};
 
-  // std::cerr << "Launching kernel\n";
+  std::cerr << "Launching kernel\n";
 
   CUevent start;
   CUevent stop;
@@ -140,17 +163,28 @@ ulong * RunPTX(std::string PTXFilename, char * fileBuffer, ulong filesize, bool 
   cuEventRecord(start,0);
 
   // Kernel launch
-  checkCudaErrors(cuLaunchKernel(function, gridSizeX, gridSizeY, gridSizeZ,
-                                 blockSizeX, blockSizeY, blockSizeZ,
-                                 0, NULL, KernelParams, NULL));
-  // std::cerr << "kernel success.\n";
+  for (PtxBundle & bundle : bundles) {
+
+    CUdeviceptr devBufferOutput;
+    checkCudaErrors(cuMemAlloc(&devBufferOutput, outputSize));
+
+    // Kernel parameters
+    void *KernelParams[] = { &devBufferInput, &devStartPoints, &devBufferSizes, &devBufferOutput};
+
+    checkCudaErrors(cuLaunchKernel(bundle.function, gridSizeX, gridSizeY, gridSizeZ,
+                                   blockSizeX, blockSizeY, blockSizeZ,
+                                   0, bundle.stream, KernelParams, NULL));
+
+    bundle.devBufferOutput = devBufferOutput;
+  }
+  std::cerr << "kernel success.\n";
 
   cuEventCreate(&stop, CU_EVENT_BLOCKING_SYNC);
   cuEventRecord(stop,0);
   cuEventSynchronize(stop);
 
   cuEventElapsedTime(&elapsedTime, start, stop);
-  // printf("GPU Kernel time : %f ms\n" ,elapsedTime);
+  printf("GPU Kernel time : %f ms\n" ,elapsedTime);
 
   // Retrieve device data
   ulong * matchRslt;
@@ -158,20 +192,26 @@ ulong * RunPTX(std::string PTXFilename, char * fileBuffer, ulong filesize, bool 
     std::cerr << "Cannot allocate memory for output.\n";
     exit(-1);
   }
-  checkCudaErrors(cuMemcpyDtoH(matchRslt, devBufferOutput, outputSize));
 
-  if (CountOnly){
-    int count = 0;
-    for (unsigned i = 0; i < GROUPTHREADS * numOfGroups; ++i) {
-      // std::cout << i << ":" << matchRslt[i] << "\n";
-      count += matchRslt[i];
+  int count = 0;
+
+  for (PtxBundle const & bundle : bundles) {
+    checkCudaErrors(cuMemcpyDtoH(matchRslt, bundle.devBufferOutput, outputSize));
+
+    if (CountOnly){
+      for (unsigned i = 0; i < GROUPTHREADS * numOfGroups; ++i) {
+        // std::cout << i << ":" << matchRslt[i] << "\n";
+        count += matchRslt[i];
+      }
     }
-    std::cout << count << "\n";
+    else{
+      for(unsigned i=0; i<=numOfGroups; i++){
+        accumBytes[i] = startPoints[i] - divPoints[i];
+      }
+    }
   }
-  else{
-    for(unsigned i=0; i<=numOfGroups; i++){
-      accumBytes[i] = startPoints[i] - divPoints[i];
-    }
+  if (CountOnly) {
+    std::cout << count << "\n";
   }
 
 
@@ -179,8 +219,10 @@ ulong * RunPTX(std::string PTXFilename, char * fileBuffer, ulong filesize, bool 
   checkCudaErrors(cuMemFree(devBufferInput));
   checkCudaErrors(cuMemFree(devStartPoints));
   checkCudaErrors(cuMemFree(devBufferSizes));
-  checkCudaErrors(cuMemFree(devBufferOutput));
-  checkCudaErrors(cuModuleUnload(cudaModule));
+  for (PtxBundle const & bundle : bundles) {
+    cudaStreamDestroy(bundle.stream);
+    checkCudaErrors(cuMemFree(bundle.devBufferOutput));
+  }
   checkCudaErrors(cuCtxDestroy(context));
 
   return matchRslt;

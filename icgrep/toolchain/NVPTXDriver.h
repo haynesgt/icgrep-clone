@@ -22,6 +22,8 @@ public:
 
     void finalizeObject() override;
 
+    void finalizeObject(int REi) override;
+
     bool hasExternalFunction(const llvm::StringRef /* functionName */) const override { return false; }
 
     void * getMain() override; // "main" exists until the driver is deleted

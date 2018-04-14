@@ -197,7 +197,7 @@ int main(int argc, char *argv[]) {
             if(PTXFile=="")
                 grepEngine.grepCodeGen_nvptx(REs, grep::Mode, UTF_16);
             for (unsigned i = 0; i != allFiles.size(); ++i) {
-                grepEngine.doGrep(allFiles[i], PTXFile);
+                grepEngine.doGrep(allFiles[i], PTXFile, (int) REs.size());
             }
             return 0;
         } else {

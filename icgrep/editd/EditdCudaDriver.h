@@ -7,6 +7,7 @@
 #include <cassert>
 #include <toolchain/toolchain.h>
 #include "cuda.h"
+#include "cuda_runtime.h"
 
 #define GROUPTHREADS 64
 

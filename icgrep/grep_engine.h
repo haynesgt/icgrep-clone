@@ -34,7 +34,7 @@ public:
 
     void grepCodeGen_nvptx(std::vector<re::RE *> REs, GrepModeType grepMode, bool UTF_16);
 
-    void doGrep(const std::string & fileName, std::string & PTXFilename) const;
+    void doGrep(const std::string & fileName, std::string & PTXFilename, int REn) const;
     
     uint64_t doGrep(const std::string & fileName, const uint32_t fileIdx) const;
 
