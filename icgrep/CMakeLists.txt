@@ -38,7 +38,6 @@ if(ENABLE_CUDA_COMPILE)
     include_directories(${CUDA_INCLUDE})
     SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCUDA_ENABLED")
     SET(CUDA_LIB "cuda")
-    SET(CUDA_RT "cudart")
   endif(CUDA_FOUND)
 endif()
 
