@@ -22,7 +22,7 @@ struct PtxBundle {
 };
 
 /// main - Program entry point
-ulong * RunPTX(std::string PTXFilename_in, char * fileBuffer, ulong filesize, bool CountOnly, std::vector<size_t> LFPositions, ulong * startPoints, ulong * accumBytes, int REn) {
+ulong * RunPTX(const std::vector<std::string> & ptx_files, char * fileBuffer, ulong filesize, bool CountOnly, std::vector<size_t> LFPositions, ulong * startPoints, ulong * accumBytes, int REn) {
   
   CUdevice    device;
   CUcontext   context;
@@ -30,7 +30,6 @@ ulong * RunPTX(std::string PTXFilename_in, char * fileBuffer, ulong filesize, bo
   int         devCount;
 
   CUmodule cudaModule;
-  std::string PTXFilename = PTXFilename_in;
 
   // CUDA initialization
   checkCudaErrors(cuInit(0));
@@ -56,9 +55,9 @@ ulong * RunPTX(std::string PTXFilename_in, char * fileBuffer, ulong filesize, bo
   CUfunction  function;
 
   for (int REi = 0; REi < REn; REi++) {
-    std::ifstream t(PTXFilename + std::to_string(REi) + std::string(".ptx"));
+    std::ifstream t(ptx_files.at(REi));
     if (!t.is_open()) {
-      std::cerr << "Error: cannot open " << PTXFilename << " for processing. Skipped.\n";
+      std::cerr << "Error: cannot open " << ptx_files.at(REi) << " for processing. Skipped.\n";
       exit(-1);
     }
 

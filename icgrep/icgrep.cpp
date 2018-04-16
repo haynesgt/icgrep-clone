@@ -45,8 +45,6 @@ static cl::opt<bool> ByteMode("enable-byte-mode", cl::desc("Process regular expr
 static cl::opt<bool> MultiGrepKernels("enable-multigrep-kernels", cl::desc("Construct separated kernels for each regular expression"));
 static cl::opt<int> REsPerGroup("re-num", cl::desc("Number of regular expressions processed by each kernel."), cl::init(1));
 
-static cl::opt<std::string> PTXFile("ptx", cl::desc("compiled PTX file."), cl::init(""));
-
 static std::vector<std::string> allFiles;
 static re::ModeFlagSet globalFlags = 0;
 
@@ -194,10 +192,9 @@ int main(int argc, char *argv[]) {
     } else {
                
         if (codegen::NVPTX) {
-            if(PTXFile=="")
-                grepEngine.grepCodeGen_nvptx(REs, grep::Mode, UTF_16);
+            std::vector<std::string> ptx_files = grepEngine.grepCodeGen_nvptx(REs, grep::Mode, UTF_16);
             for (unsigned i = 0; i != allFiles.size(); ++i) {
-                grepEngine.doGrep(allFiles[i], PTXFile, (int) REs.size());
+                grepEngine.doGrep(allFiles[i], ptx_files, (int) REs.size());
             }
             return 0;
         } else {

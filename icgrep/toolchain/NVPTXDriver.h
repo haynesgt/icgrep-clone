@@ -8,6 +8,9 @@
 #define NVPTXDRIVER_H
 
 #include "driver.h"
+#include <toolchain/object_cache.h>
+
+#define PTX_CACHE_NAMESPACE "ptx"
 
 class NVPTXDriver final : public Driver {
     friend class CBuilder;
@@ -20,6 +23,8 @@ public:
     
     void makeKernelCall(kernel::Kernel * kb, const std::vector<parabix::StreamSetBuffer *> & inputs, const std::vector<parabix::StreamSetBuffer *> & outputs) override;
 
+    std::string getPTXFilename();
+
     void finalizeObject() override;
 
     void finalizeObject(int REi) override;
@@ -31,6 +36,8 @@ public:
 private:
 
     llvm::Function * addLinkFunction(llvm::Module * mod, llvm::StringRef name, llvm::FunctionType * type, void * functionPtr) const override;
+
+    ParabixObjectCache *                                    mCache;
 
 };
 

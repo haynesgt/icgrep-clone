@@ -32,9 +32,10 @@ public:
 
     void grepCodeGen(std::vector<re::RE *> REs, GrepModeType grepMode, bool UTF_16, GrepSource grepSource);
 
-    void grepCodeGen_nvptx(std::vector<re::RE *> REs, GrepModeType grepMode, bool UTF_16);
+    // Returns a list of PTX filenames, one per regular expression
+    std::vector<std::string> grepCodeGen_nvptx(std::vector<re::RE *> REs, GrepModeType grepMode, bool UTF_16);
 
-    void doGrep(const std::string & fileName, std::string & PTXFilename, int REn) const;
+    void doGrep(const std::string & fileName, const std::vector<std::string> & PTXFilename, int REn) const;
     
     uint64_t doGrep(const std::string & fileName, const uint32_t fileIdx) const;
 

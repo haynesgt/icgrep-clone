@@ -5,6 +5,7 @@
  */
 
 #include "NVPTXDriver.h"
+#include <boost/filesystem.hpp>
 #include <IR_Gen/idisa_target.h>
 #include <kernels/kernel_builder.h>
 #include <kernels/kernel.h>
@@ -47,6 +48,14 @@ NVPTXDriver::NVPTXDriver(std::string && moduleName)
     iBuilder.reset(IDISA::GetIDISA_GPU_Builder(*mContext));
     iBuilder->setModule(mMainModule);
     iBuilder->CreateBaseFunctions();
+
+    if (LLVM_LIKELY(codegen::EnableObjectCache)) {
+      if (codegen::ObjectCacheDir) {
+        mCache = new ParabixObjectCache(codegen::ObjectCacheDir);
+      } else {
+        mCache = new ParabixObjectCache();
+      }
+    }
 }
 
 void NVPTXDriver::makeKernelCall(kernel::Kernel * kb, const std::vector<parabix::StreamSetBuffer *> & inputs, const std::vector<parabix::StreamSetBuffer *> & outputs) {
@@ -200,7 +209,26 @@ void NVPTXDriver::finalizeObject() {
   assert("Need to know main function in order to finalize object\n" && false);
 }
 
+std::string NVPTXDriver::getPTXFilename() {
+    std::string PTXFilename;
+    if (!mCache->getCachedPipelineFilename(
+        PTX_CACHE_NAMESPACE, iBuilder, mPipeline, PTXFilename, ".ptx")) {
+      // TODO: Fix cacheable flags and fix this problem
+      assert("Pipeline is not cacheable, so driver may use out of date pipeline." && false);
+      PTXFilename = mMainModule->getModuleIdentifier() + ".ptx";
+    }
+    // printf("Cache: %s\n", PTXFilename.c_str());
+    return PTXFilename;
+}
+
 void NVPTXDriver::finalizeObject(int REi) {
+
+    std::string PTXFilename = getPTXFilename();
+
+    if (boost::filesystem::exists(PTXFilename)) {
+      // Cached copy exists
+      return;
+    }
 
     legacy::PassManager PM;
     PM.add(createPromoteMemoryToRegisterPass()); //Force the use of mem2reg to promote stack variables.
@@ -231,7 +259,6 @@ void NVPTXDriver::finalizeObject(int REi) {
 //        mMainModule->dump();
 //    }
 
-    const auto PTXFilename = mMainModule->getModuleIdentifier() + ".ptx";
 
     llvm2ptx(mMainModule, PTXFilename);
 }

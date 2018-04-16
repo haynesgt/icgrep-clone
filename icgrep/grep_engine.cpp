@@ -98,7 +98,7 @@ bool matchesNeedToBeMovedToEOL() {
     return true;
 }
     
-void GrepEngine::doGrep(const std::string & fileName, std::string & PTXFilename, int REn) const{
+void GrepEngine::doGrep(const std::string & fileName, const std::vector<std::string> & ptx_files, int REn) const{
 #ifdef CUDA_ENABLED
     const bool CountOnly = true;
     boost::filesystem::path file(fileName);
@@ -129,11 +129,7 @@ void GrepEngine::doGrep(const std::string & fileName, std::string & PTXFilename,
                 std::cerr << "Cannot allocate memory for startPoints or accumBytes.\n";
                 exit(-1);
             }
-            if(PTXFilename=="")
-                PTXFilename = mGrepDriver->getBuilder()->getModule()->getModuleIdentifier() + ".ptx";
-                PTXFilename = std::string("engine");
-                //PTXFilename = std::string("engine0.ptx");
-            RunPTX(PTXFilename, fileBuffer, fileSize, CountOnly, LFPositions, startPoints, accumBytes, REn);
+            RunPTX(ptx_files, fileBuffer, fileSize, CountOnly, LFPositions, startPoints, accumBytes, REn);
             source.close();
         } catch (std::exception & e) {
             if (!NoMessagesFlag) {
@@ -388,7 +384,7 @@ std::pair<StreamSetBuffer *, StreamSetBuffer *> grepPipeline(Driver * grepDriver
 
 
     
-void GrepEngine::grepCodeGen_nvptx(std::vector<re::RE *> REs, const GrepModeType grepMode, const bool UTF_16) {
+std::vector<std::string> GrepEngine::grepCodeGen_nvptx(std::vector<re::RE *> REs, const GrepModeType grepMode, const bool UTF_16) {
 
     assert (mGrepDriver == nullptr);
 
@@ -396,9 +392,11 @@ void GrepEngine::grepCodeGen_nvptx(std::vector<re::RE *> REs, const GrepModeType
 
     int REi = 0;
 
+    std::vector<std::string> ptx_files;
 
     for (re::RE * & REx : REs) {
-      mGrepDriver = new NVPTXDriver("engine" + std::to_string(REi));
+      NVPTXDriver * driver = new NVPTXDriver("engine" + std::to_string(REi));
+      mGrepDriver = driver;
       auto & idb = mGrepDriver->getBuilder();
       Module * M = idb->getModule();
 
@@ -457,11 +455,14 @@ void GrepEngine::grepCodeGen_nvptx(std::vector<re::RE *> REs, const GrepModeType
       idb->CreateStore(matchedLineCount, outputThreadPtr);
       idb->CreateRetVoid();
 
+      ptx_files.push_back(driver->getPTXFilename());
+
       mGrepDriver->finalizeObject(REi);
 
       REi++;
     }
     mGrepDriver->deallocateBuffers();
+    return ptx_files;
 }
 
 void GrepEngine::grepCodeGen(std::vector<re::RE *> REs, const GrepModeType grepMode, const bool UTF_16, GrepSource grepSource) {
