@@ -40,6 +40,16 @@ class ParabixObjectCache final : public llvm::ObjectCache {
 public:
     ParabixObjectCache();
     ParabixObjectCache(const std::string & dir);
+    // Stores pipeline filename in <filename> parameter
+    // Returns true if the pipeline is cacheable.
+    // Returns false if the pipeline is not cacheable.
+    bool getCachedPipelineFilename(
+      std::string namespace_str,
+      const std::unique_ptr<kernel::KernelBuilder> & idb,
+      const std::vector<kernel::Kernel *> pipeline,
+      std::string& filename,
+      const std::string suffix
+    );
     bool loadCachedObjectFile(const std::unique_ptr<kernel::KernelBuilder> & idb, kernel::Kernel * const kernel);
     void notifyObjectCompiled(const llvm::Module *M, llvm::MemoryBufferRef Obj) override;
     void cleanUpObjectCacheFiles();

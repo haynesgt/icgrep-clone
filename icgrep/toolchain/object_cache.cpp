@@ -13,6 +13,8 @@
 #include <boost/filesystem.hpp>
 #include <boost/range/iterator_range.hpp>
 #include <ctime>
+#include <boost/uuid/sha1.hpp>
+#include <sstream>
 
 using namespace llvm;
 
@@ -60,6 +62,17 @@ const static auto SIGNATURE = "signature";
 
 const static boost::uintmax_t CACHE_SIZE_LIMIT = 5 * 1024 * 1024;
 
+inline static std::string sha1sum(const std::string & str) {
+    char buffer[41];    // 40 hex-digits and the terminating null
+    uint32_t digest[5]; // 160 bits in total
+    boost::uuids::detail::sha1 sha1;
+    sha1.process_bytes(str.c_str(), str.size());
+    sha1.get_digest(digest);
+    snprintf(buffer, sizeof(buffer), "%.8x%.8x%.8x%.8x%.8x",
+             digest[0], digest[1], digest[2], digest[3], digest[4]);
+    return std::string(buffer);
+}
+
 const MDString * getSignature(const llvm::Module * const M) {
     NamedMDNode * const sig = M->getNamedMetadata(SIGNATURE);
     if (sig) {
@@ -68,6 +81,59 @@ const MDString * getSignature(const llvm::Module * const M) {
         return cast<MDString>(sig->getOperand(0)->getOperand(0));
     }
     return nullptr;
+}
+
+bool pipelineToId(
+  std::string namespace_str,
+  const std::unique_ptr<kernel::KernelBuilder> & idb,
+  std::vector<kernel::Kernel *> pipeline,
+  std::string& id
+)  {
+  std::stringstream ss;
+  ss << "{";
+  ss << "\"prefix\":" << CACHE_PREFIX << "\",";
+  ss << "\"namespace\":\"" << namespace_str << "\",kernels:[";
+
+
+  bool first_kernel = true;
+  for (kernel::Kernel * const kernel : pipeline) {
+    if (LLVM_LIKELY(kernel->isCachable())) {
+      if (!first_kernel) {
+        ss << ",";
+      } else {
+        first_kernel = false;
+      }
+      Module * const module = kernel->getModule();
+      assert ("kernel module cannot be null!" && module);
+      ss << "{";
+      ss << "\"moduleId\":" << module->getModuleIdentifier() << "\",";
+      ss << "\"signature\":" << kernel->makeSignature(idb) << "\"";
+      ss << "}";
+
+    } else {
+      return false;
+    }
+  }
+  ss << "]}";
+  id = ss.str();
+}
+
+
+bool ParabixObjectCache::getCachedPipelineFilename(
+  std::string namespace_str,
+  const std::unique_ptr<kernel::KernelBuilder> & idb,
+  const std::vector<kernel::Kernel *> pipeline,
+  std::string& filename,
+  const std::string suffix
+) {
+  std::string id;
+  if (pipelineToId(namespace_str, idb, pipeline, id)) {
+    std::string objectName(mCachePath.str().str());
+    objectName.append((id));
+    filename.assign(objectName);
+  } else {
+    return false;
+  }
 }
 
 bool ParabixObjectCache::loadCachedObjectFile(const std::unique_ptr<kernel::KernelBuilder> & idb, kernel::Kernel * const kernel) {
