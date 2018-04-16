@@ -43,6 +43,7 @@ private:
 class MemorySourceKernel final : public SegmentOrientedKernel {
 public:
     MemorySourceKernel(const std::unique_ptr<kernel::KernelBuilder> & iBuilder, llvm::Type * type, unsigned blocksPerSegment = 1, unsigned codeUnitWidth = 8);
+    bool isCachable() const override { return true; }
     bool hasSignature() const override { return false; }
 protected:
     void generateInitializeMethod(const std::unique_ptr<kernel::KernelBuilder> & iBuilder) override;

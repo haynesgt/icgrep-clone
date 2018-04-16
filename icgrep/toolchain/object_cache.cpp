@@ -92,7 +92,8 @@ bool pipelineToId(
   std::stringstream ss;
   ss << "{";
   ss << "\"prefix\":" << CACHE_PREFIX << "\",";
-  ss << "\"namespace\":\"" << namespace_str << "\",kernels:[";
+  ss << "\"namespace\":\"" << namespace_str << "\",";
+
 
 
   bool first_kernel = true;
@@ -102,20 +103,26 @@ bool pipelineToId(
         ss << ",";
       } else {
         first_kernel = false;
+        Module * const module = kernel->getModule();
+        assert ("kernel module cannot be null!" && module);
+        ss << "\"moduleId\":" << module->getModuleIdentifier() << "\",kernels:[";
       }
-      Module * const module = kernel->getModule();
-      assert ("kernel module cannot be null!" && module);
       ss << "{";
-      ss << "\"moduleId\":" << module->getModuleIdentifier() << "\",";
-      ss << "\"signature\":" << kernel->makeSignature(idb) << "\"";
+      if (kernel->hasSignature()) {
+        ss << "\"signature\":" << kernel->makeSignature(idb) << "\"";
+      } else {
+        ss << "\"name\":" << kernel->getName() << "\"";
+      }
       ss << "}";
 
     } else {
-      return false;
+      // printf("Can't cache %s\n", kernel->getName().c_str());
+      // return false;
     }
   }
   ss << "]}";
   id = ss.str();
+  return true;
 }
 
 
@@ -128,9 +135,12 @@ bool ParabixObjectCache::getCachedPipelineFilename(
 ) {
   std::string id;
   if (pipelineToId(namespace_str, idb, pipeline, id)) {
-    std::string objectName(mCachePath.str().str());
-    objectName.append((id));
-    filename.assign(objectName);
+    Path objectName(mCachePath);
+    sys::path::append(objectName, sha1sum(id) + suffix);
+    filename.assign(
+        objectName.str().str()
+    );
+    return true;
   } else {
     return false;
   }

@@ -42,7 +42,8 @@ public:
     ParabixObjectCache(const std::string & dir);
     // Stores pipeline filename in <filename> parameter
     // Returns true if the pipeline is cacheable.
-    // Returns false if the pipeline is not cacheable.
+    // Returns true if the pipeline is not cacheable.
+    // TODO: make cc_kernel cacheable and return false when pipeline is not cacheable
     bool getCachedPipelineFilename(
       std::string namespace_str,
       const std::unique_ptr<kernel::KernelBuilder> & idb,
